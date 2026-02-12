@@ -10,8 +10,8 @@ import jwt from 'jsonwebtoken';
 // Kling AI API 설정
 // ============================================================================
 
-const KLING_ACCESS_KEY = 'AT43bEh9rHFypJENnKmGQ3aebAPQeCEk';
-const KLING_SECRET_KEY = 'bHMfMmgtLP89KGLYDPG9yMpKky8JnfeJ';
+const KLING_ACCESS_KEY = process.env.KLING_ACCESS_KEY || '';
+const KLING_SECRET_KEY = process.env.KLING_SECRET_KEY || '';
 const KLING_API_BASE = 'https://api-singapore.klingai.com';
 
 // 기본 모델 이미지 (Virtual Try-On에 사용) - 성별별 모델

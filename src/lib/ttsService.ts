@@ -8,7 +8,7 @@ import type { Gender } from './types';
 // ElevenLabs TTS 설정
 // ============================================================================
 
-const ELEVENLABS_API_KEY = 'sk_8469d80ce46639523419442eec6086b319cdbaa464fce1bf';
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 const ELEVENLABS_API_BASE = 'https://api.elevenlabs.io/v1';
 const ELEVENLABS_MODEL = 'eleven_multilingual_v2'; // 한국어 포함 29개 언어 지원
 
