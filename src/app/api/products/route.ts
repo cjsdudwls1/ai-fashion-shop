@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
             colors,
             sizes,
             videoUrl: null,
+            audioUrl: null,
             videoStatus: 'pending',
             createdAt: new Date(),
         };
@@ -78,9 +79,9 @@ export async function POST(request: NextRequest) {
                 fabric: body.fabric,
                 gender,
             }).then(() => {
-                console.log(`[Product] AI 영상 생성 성공`);
+                console.log(`[Product] AI 영상+음성 생성 완료`);
             }).catch(err => {
-                console.error(`[Product] 영상 생성 백그라운드 오류:`, err);
+                console.error(`[Product] 영상 생성 실패:`, err.message || err);
             });
         }, 100);
 

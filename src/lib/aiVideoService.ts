@@ -1,8 +1,9 @@
-// AI 아바타 영상 생성 서비스 - Kling AI 연동
-// 워크플로우: 1) Virtual Try-On → 2) Image-to-Video (오디오 포함)
+// AI 아바타 영상 생성 서비스 - Kling AI + ElevenLabs TTS 연동
+// 워크플로우: 1) Virtual Try-On → 2) Image-to-Video (kling-v2-6, 무음) → 3) ElevenLabs TTS 나레이션 생성
 
 import { productStore } from './productStore';
 import type { Gender } from './types';
+import { generateProductNarration, audioToDataUrl } from './ttsService';
 import jwt from 'jsonwebtoken';
 
 // ============================================================================
@@ -16,8 +17,10 @@ const KLING_API_BASE = 'https://api-singapore.klingai.com';
 // 기본 모델 이미지 (Virtual Try-On에 사용) - 성별별 모델
 const MODEL_IMAGES = {
     female: 'https://res.cloudinary.com/dpaqhv0ay/image/upload/v1770710879/Gemini_Generated_Image_lqt41ilqt41ilqt4_pnxc3t.png',
-    male: 'https://photo.newsen.com/news_photo/2019/10/30/201910302027111810_1.jpg'
+    male: 'https://res.cloudinary.com/dpaqhv0ay/image/upload/v1770792500/Gemini_Generated_Image_9trm2p9trm2p9trm_v5hkp0.png'
 };
+
+
 
 // ============================================================================
 // JWT 토큰 생성
@@ -149,7 +152,6 @@ async function callVirtualTryOn(
         }
         console.log(`[Kling] Try-On 작업 ID: ${taskId}`);
 
-        // 결과 대기 (최대 3분)
         const result = await pollTask(`/v1/images/kolors-virtual-try-on/${taskId}`, 36);
         if (result.success) {
             const resultData = result.data as { images?: Array<{ url?: string }> };
@@ -167,50 +169,58 @@ async function callVirtualTryOn(
     }
 }
 
+
+
 // ============================================================================
-// 2단계: Image-to-Video + 오디오 (kling-v2-6, enable_audio)
+// 2단계: Image-to-Video + 음성 (kling-v2-6, sound:"on" + voice_list)
 // ============================================================================
 async function callImageToVideo(
     imageUrl: string,
     productInfo: { name: string; fabric: string; gender: Gender }
 ): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
-    console.log(`[Kling] ===== 2단계: Image-to-Video (오디오 포함) =====`);
+    console.log(`[Kling] ===== 2단계: Image-to-Video (Sound Off: 화질 우선) =====`);
     console.log(`[Kling] 입력 이미지: ${imageUrl.substring(0, 80)}...`);
 
-    const genderText = productInfo.gender === 'female' ? '여성' : '남성';
-    const prompt = `A professional ${genderText} fashion model wearing ${productInfo.name}. The model is presenting the clothing naturally in a studio with soft lighting, slowly turning to show the ${productInfo.fabric} fabric texture. The model says: "안녕하세요, 이 멋진 ${productInfo.name}을 소개합니다. ${productInfo.fabric} 소재로 제작되어 착용감이 편안합니다." High quality, 4K, professional fashion video.`;
+    // 화질을 위해 오디오 생성 비활성화 (추후 별도 TTS 합성 권장)
+    // 한글 텍스트 제거 및 purely visual prompt 사용
+    // productInfo.gender가 'male'/'female'이므로 그대로 사용하거나 영문으로 매핑
+    const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
+
+    const prompt = `A professional ${genderStr} fashion model wearing ${productInfo.name} in a studio with soft lighting. The model turns to show the ${productInfo.fabric} fabric texture. High quality, 4K, cinematic fashion video.`;
+
+    console.log(`[Kling] 프롬프트: ${prompt}`);
+
+    // API 요청 바디 구성 (공식 문서 기준)
+    const requestBody: Record<string, unknown> = {
+        model_name: 'kling-v2-6',
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
+        mode: 'pro',
+        duration: '5',
+        aspect_ratio: '9:16',
+        sound: 'off'  // 화질 우선 (오디오 없음)
+    };
+
+
+    console.log(`[Kling] 요청 파라미터:`, JSON.stringify({ ...requestBody, image: '(생략)' }));
 
     try {
-        const data = await klingRequest('/v1/videos/image2video', 'POST', {
-            model_name: 'kling-v2-6',       // 최신 모델 (오디오 지원)
-            image: imageUrl,
-            prompt: prompt,
-            negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
-            cfg_scale: 0.5,
-            mode: 'pro',                    // pro 모드 (오디오 필수)
-            duration: '5',
-            aspect_ratio: '9:16',           // 세로형 (모델 이미지 비율 유지)
-            enable_audio: true              // 네이티브 오디오 생성
-        }) as { code?: number; message?: string; data?: { task_id?: string } };
+        const data = await klingRequest('/v1/videos/image2video', 'POST', requestBody) as { code?: number; message?: string; data?: { task_id?: string } };
 
         if (data.code !== 0) {
             console.error(`[Kling] Video 생성 요청 실패: ${data.message}`);
-
-            // kling-v2-6 실패 시 kling-v1-6으로 폴백 (오디오 없이)
             if (data.code === 1203 || data.code === 1201) {
-                console.warn('[Kling] kling-v2-6 미지원 → kling-v1-6으로 재시도 (오디오 없음)');
+                console.warn('[Kling] kling-v2-6 미지원 → kling-v1-6으로 재시도');
                 return await callImageToVideoFallback(imageUrl, productInfo);
             }
             return { success: false, error: data.message || 'Video 생성 요청 실패' };
         }
 
         const taskId = data.data?.task_id;
-        if (!taskId) {
-            return { success: false, error: 'task_id 없음' };
-        }
-        console.log(`[Kling] Video 작업 ID: ${taskId} (오디오 포함)`);
+        if (!taskId) return { success: false, error: 'task_id 없음' };
+        console.log(`[Kling] Video 작업 ID: ${taskId}`);
 
-        // 결과 대기 (최대 10분)
         const result = await pollTask(`/v1/videos/image2video/${taskId}`, 120);
         if (result.success) {
             const resultData = result.data as { videos?: Array<{ url?: string }> };
@@ -228,13 +238,12 @@ async function callImageToVideo(
     }
 }
 
-// kling-v2-6 실패 시 폴백 (오디오 없이)
+// kling-v2-6 실패 시 폴백
 async function callImageToVideoFallback(
     imageUrl: string,
     productInfo: { name: string; fabric: string; gender: Gender }
 ): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
-    console.log(`[Kling] === 폴백: kling-v1-6 (오디오 없음) ===`);
-
+    console.log(`[Kling] === 폴백: kling-v1-6 ===`);
     const genderText = productInfo.gender === 'female' ? '여성' : '남성';
     const prompt = `A professional ${genderText} fashion model wearing ${productInfo.name}. Natural movements, turning to show ${productInfo.fabric} fabric texture. High quality, 4K, studio lighting.`;
 
@@ -250,9 +259,7 @@ async function callImageToVideoFallback(
             aspect_ratio: '9:16'
         }) as { code?: number; message?: string; data?: { task_id?: string } };
 
-        if (data.code !== 0) {
-            return { success: false, error: data.message || 'Video 폴백 실패' };
-        }
+        if (data.code !== 0) return { success: false, error: data.message || 'Video 폴백 실패' };
 
         const taskId = data.data?.task_id;
         if (!taskId) return { success: false, error: 'task_id 없음' };
@@ -263,7 +270,7 @@ async function callImageToVideoFallback(
             const resultData = result.data as { videos?: Array<{ url?: string }> };
             const videoUrl = resultData?.videos?.[0]?.url;
             if (videoUrl) {
-                console.log(`[Kling] 폴백 Video 생성 성공 (오디오 없음)`);
+                console.log(`[Kling] 폴백 Video 생성 성공`);
                 return { success: true, videoUrl };
             }
         }
@@ -273,8 +280,11 @@ async function callImageToVideoFallback(
     }
 }
 
+
+
 // ============================================================================
 // 통합 함수 - 전체 워크플로우 실행
+// 1) Virtual Try-On → 2) Image-to-Video (무음) → 3) ElevenLabs TTS 나레이션
 // ============================================================================
 export async function generateProductVideo(
     productId: string,
@@ -282,10 +292,10 @@ export async function generateProductVideo(
     productInfo: { name: string; fabric: string; gender: Gender }
 ): Promise<void> {
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`[Kling AI] 영상 생성 시작: ${productId}`);
-    console.log(`[Kling AI] 상품: ${productInfo.name} (${productInfo.gender === 'female' ? '여성복' : '남성복'})`);
-    console.log(`[Kling AI] 소재: ${productInfo.fabric}`);
-    console.log(`[Kling AI] 워크플로우: Try-On → Image-to-Video (오디오 포함)`);
+    console.log(`[AI Service] 영상+음성 생성 시작: ${productId}`);
+    console.log(`[AI Service] 상품: ${productInfo.name} (${productInfo.gender === 'female' ? '여성복' : '남성복'})`);
+    console.log(`[AI Service] 소재: ${productInfo.fabric}`);
+    console.log(`[AI Service] 워크플로우: Try-On → Image-to-Video (무음) → ElevenLabs TTS 나레이션`);
     console.log(`${'='.repeat(60)}\n`);
 
     try {
@@ -297,34 +307,59 @@ export async function generateProductVideo(
         let imageForVideo: string;
         if (tryOnResult.success && tryOnResult.imageUrl) {
             imageForVideo = tryOnResult.imageUrl;
-            console.log(`\n[Kling AI] 1단계 결과: 성공 - 모델에 의류 착용 완료\n`);
+            console.log(`\n[AI Service] 1단계 결과: 성공 - 모델에 의류 착용 완료\n`);
         } else {
-            console.warn(`\n[Kling AI] 1단계 결과: 실패 (${tryOnResult.error})`);
-            console.warn('[Kling AI] → Try-On 건너뛰고 원본 이미지로 영상 생성 진행\n');
+            console.warn(`\n[AI Service] 1단계 결과: 실패 (${tryOnResult.error})`);
+            console.warn('[AI Service] → Try-On 건너뛰고 원본 이미지로 영상 생성 진행\n');
             if (isBase64Image(imageBase64OrUrl)) {
                 imageForVideo = stripBase64Prefix(imageBase64OrUrl);
-                console.log('[Kling AI] Base64 이미지를 Image-to-Video에 직접 전달');
             } else {
                 imageForVideo = imageBase64OrUrl;
             }
         }
 
-        // ===== 2단계: Image-to-Video + 오디오 =====
+        // ===== 2단계: Image-to-Video (무음 - 화질 우선) =====
         const videoResult = await callImageToVideo(imageForVideo, productInfo);
 
+        // ===== 3단계: ElevenLabs TTS 나레이션 생성 (2단계와 독립) =====
+        // 비디오 생성과 병렬로 실행할 수도 있지만, 순차 실행으로 안정성 확보
+        let audioDataUrl: string | undefined;
+        console.log(`\n[AI Service] ===== 3단계: ElevenLabs TTS 나레이션 생성 =====`);
+        try {
+            const ttsResult = await generateProductNarration(productInfo);
+            if (ttsResult.success && ttsResult.audioBase64 && ttsResult.mimeType) {
+                audioDataUrl = audioToDataUrl(ttsResult.audioBase64, ttsResult.mimeType);
+                console.log(`[AI Service] 3단계 결과: TTS 생성 성공 (${Math.round(ttsResult.audioBase64.length / 1024)}KB)`);
+            } else {
+                console.warn(`[AI Service] 3단계 결과: TTS 생성 실패 (${ttsResult.error}) → 무음 영상으로 진행`);
+            }
+        } catch (ttsError) {
+            console.warn(`[AI Service] 3단계 TTS 오류 (무시하고 진행):`, ttsError);
+        }
+
+        // ===== 결과 저장 =====
         if (videoResult.success && videoResult.videoUrl) {
-            productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl);
+            productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl);
             console.log(`\n${'='.repeat(60)}`);
-            console.log(`[Kling AI] 영상 생성 완료!`);
-            console.log(`[Kling AI] URL: ${videoResult.videoUrl.substring(0, 80)}...`);
+            console.log(`[AI Service] 영상+음성 생성 완료!`);
+            console.log(`[AI Service] 비디오 URL: ${videoResult.videoUrl.substring(0, 80)}...`);
+            console.log(`[AI Service] 나레이션: ${audioDataUrl ? '있음' : '없음 (무음)'}`);
             console.log(`${'='.repeat(60)}\n`);
         } else {
-            productStore.updateVideoStatus(productId, 'failed');
-            console.error(`\n[Kling AI] 영상 생성 실패: ${videoResult.error}\n`);
+            // 영상 실패해도 TTS 오디오가 있으면 함께 저장 (나중에 영상 재생성 시 활용)
+            productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl);
+            const errorMsg = `영상 생성 실패: ${videoResult.error}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
+            console.error(`\n[AI Service] ${errorMsg}\n`);
+            throw new Error(errorMsg);
         }
     } catch (error) {
-        productStore.updateVideoStatus(productId, 'failed');
-        console.error(`[Kling AI] 오류:`, error);
+        // 이미 updateVideoStatus가 호출되지 않은 경우에만 실패 처리
+        const product = productStore.getProduct(productId);
+        if (product && product.videoStatus === 'generating') {
+            productStore.updateVideoStatus(productId, 'failed');
+        }
+        console.error(`[AI Service] 오류:`, error);
+        throw error; // 호출부에서 성공/실패 판단 가능
     }
 }
 

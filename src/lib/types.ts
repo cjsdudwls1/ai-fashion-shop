@@ -21,6 +21,7 @@ export interface Product {
   colors: ColorStock[];
   sizes: SizeStock[];
   videoUrl: string | null;
+  audioUrl: string | null;       // TTS 나레이션 오디오 (Base64 Data URL)
   videoStatus: 'pending' | 'generating' | 'completed' | 'failed';
   createdAt: Date;
 }

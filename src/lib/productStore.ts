@@ -38,13 +38,16 @@ class ProductStore {
     }
 
     // 영상 상태 업데이트
-    updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string): boolean {
+    updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string, audioUrl?: string): boolean {
         const product = this.products.get(id);
         if (!product) return false;
 
         product.videoStatus = status;
         if (videoUrl) {
             product.videoUrl = videoUrl;
+        }
+        if (audioUrl) {
+            product.audioUrl = audioUrl;
         }
 
         return true;
