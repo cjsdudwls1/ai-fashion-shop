@@ -1,60 +1,121 @@
-// 메모리 기반 상품 저장소
-// 나중에 실제 데이터베이스로 교체 가능하도록 인터페이스 설계
-
+import { createClient } from '@supabase/supabase-js';
 import { Product, ColorStock, SizeStock } from './types';
 
-class ProductStore {
-    private products: Map<string, Product> = new Map();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
+class ProductStore {
     // 상품 추가
-    addProduct(product: Product): void {
-        this.products.set(product.id, product);
+    async addProduct(product: Product): Promise<void> {
+        const { error } = await supabase
+            .from('products')
+            .insert({
+                id: product.id,
+                name: product.name,
+                image_url: product.imageUrl,
+                fabric: product.fabric,
+                gender: product.gender,
+                category: product.category, // New field for Supabase
+                colors: product.colors,
+                sizes: product.sizes,
+                video_url: product.videoUrl,
+                audio_url: product.audioUrl,
+                video_status: product.videoStatus,
+                created_at: product.createdAt
+            });
+
+        if (error) {
+            console.error('Supabase addProduct error:', error);
+            throw error;
+        }
     }
 
     // 상품 조회
-    getProduct(id: string): Product | undefined {
-        return this.products.get(id);
+    async getProduct(id: string): Promise<Product | undefined> {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error || !data) return undefined;
+        return this.mapToProduct(data);
     }
 
     // 전체 상품 조회 (최신순)
-    getAllProducts(): Product[] {
-        return Array.from(this.products.values()).sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+    async getAllProducts(): Promise<Product[]> {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Supabase getAllProducts error:', error);
+            return [];
+        }
+        return (data || []).map(this.mapToProduct);
     }
 
     // 상품 업데이트
-    updateProduct(id: string, updates: Partial<Product>): boolean {
-        const product = this.products.get(id);
-        if (!product) return false;
+    async updateProduct(id: string, updates: Partial<Product>): Promise<boolean> {
+        const dbUpdates: any = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
+        if (updates.fabric) dbUpdates.fabric = updates.fabric;
+        // Add other fields as needed... mostly used for video status
 
-        this.products.set(id, { ...product, ...updates });
-        return true;
+        const { error } = await supabase
+            .from('products')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        return !error;
     }
 
     // 상품 삭제
-    deleteProduct(id: string): boolean {
-        return this.products.delete(id);
+    async deleteProduct(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', id);
+        return !error;
     }
 
     // 영상 상태 업데이트
-    updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string, audioUrl?: string): boolean {
-        const product = this.products.get(id);
-        if (!product) return false;
+    async updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string, audioUrl?: string): Promise<boolean> {
+        const updates: any = { video_status: status };
+        if (videoUrl) updates.video_url = videoUrl;
+        if (audioUrl) updates.audio_url = audioUrl;
 
-        product.videoStatus = status;
-        if (videoUrl) {
-            product.videoUrl = videoUrl;
-        }
-        if (audioUrl) {
-            product.audioUrl = audioUrl;
-        }
+        const { error } = await supabase
+            .from('products')
+            .update(updates)
+            .eq('id', id);
 
-        return true;
+        if (error) console.error('Supabase updateVideoStatus error:', error);
+        return !error;
+    }
+
+    private mapToProduct(data: any): Product {
+        return {
+            id: data.id,
+            name: data.name,
+            imageUrl: data.image_url,
+            fabric: data.fabric,
+            gender: data.gender,
+            category: data.category || 'short-sleeve', // Map from Supabase (nullable)
+            colors: data.colors as ColorStock[],
+            sizes: data.sizes as SizeStock[],
+            videoUrl: data.video_url,
+            audioUrl: data.audio_url,
+            videoStatus: data.video_status,
+            createdAt: new Date(data.created_at)
+        };
     }
 }
 
-// 싱글톤 인스턴스 (서버 재시작 시 초기화됨)
+// 싱글톤 인스턴스
 export const productStore = new ProductStore();
 
 // 텍스트 파싱 유틸리티

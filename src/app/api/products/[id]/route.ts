@@ -10,7 +10,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const product = productStore.getProduct(id);
+        const product = await productStore.getProduct(id);
 
         if (!product) {
             return NextResponse.json(

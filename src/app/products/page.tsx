@@ -64,30 +64,30 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                     ) : null}
                 </div>
 
-                {/* 영상 상태 배지 */}
-                <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+
+            </div>
+
+            {/* 제품 정보 */}
+            <div style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: 0 }}>
+                        {product.name}
+                    </h3>
+                    {product.videoStatus === 'generating' && (
+                        <span className="badge badge-warning animate-pulse" style={{ fontSize: '11px', flexShrink: 0 }}>AI 피팅모델 생성중</span>
+                    )}
                     {product.videoStatus === 'completed' && (
-                        <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}>
                             <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7z" />
                             </svg>
                             {product.audioUrl ? '영상+나레이션' : '영상 있음'}
                         </span>
                     )}
-                    {product.videoStatus === 'generating' && (
-                        <span className="badge badge-warning animate-pulse">생성 중</span>
-                    )}
                     {product.videoStatus === 'pending' && (
-                        <span className="badge badge-info">대기 중</span>
+                        <span className="badge badge-info" style={{ fontSize: '11px', flexShrink: 0 }}>대기 중</span>
                     )}
                 </div>
-            </div>
-
-            {/* 제품 정보 */}
-            <div style={{ padding: '20px' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '8px' }}>
-                    {product.name}
-                </h3>
 
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
                     {product.fabric}
@@ -490,6 +490,8 @@ export default function ProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
 
     // 제품 목록 가져오기
     const fetchProducts = useCallback(async () => {
@@ -516,8 +518,50 @@ export default function ProductsPage() {
 
     // 비디오 재생
     const handleVideoPlay = (product: Product) => {
+        if (isEditMode) return; // 편집 모드일 때는 재생 안 함
+
         if (product.videoStatus === 'completed' && product.videoUrl) {
             setSelectedProduct(product);
+        }
+    };
+
+    // 삭제 선택 토글
+    const toggleSelectProduct = (productId: string) => {
+        setSelectedToDelete(prev => {
+            if (prev.includes(productId)) {
+                return prev.filter(id => id !== productId);
+            } else {
+                return [...prev, productId];
+            }
+        });
+    };
+
+    // 선택된 제품 삭제
+    const handleDeleteProducts = async () => {
+        if (selectedToDelete.length === 0) return;
+
+        if (!confirm(`${selectedToDelete.length}개의 상품을 정말 삭제하시겠습니까?`)) return;
+
+        try {
+            const response = await fetch('/api/products', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedToDelete })
+            });
+
+            if (response.ok) {
+                // 삭제 성공 시 목록 갱신 및 선택 초기화
+                await fetchProducts();
+                setSelectedToDelete([]);
+                setIsEditMode(false);
+                alert('삭제되었습니다.');
+            } else {
+                const data = await response.json();
+                alert(data.error || '삭제 중 오류가 발생했습니다.');
+            }
+        } catch (error) {
+            console.error('삭제 오류:', error);
+            alert('삭제 중 오류가 발생했습니다.');
         }
     };
 
@@ -525,13 +569,43 @@ export default function ProductsPage() {
         <div className="section-padding">
             <div className="container-main">
                 {/* 헤더 */}
-                <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '48px', position: 'relative' }}>
                     <h1 className="text-hero" style={{ marginBottom: '12px' }}>
                         <span className="text-gradient">제품 갤러리</span>
                     </h1>
                     <p style={{ color: 'var(--text-secondary)' }}>
                         AI가 소개하는 프리미엄 패션 아이템
                     </p>
+
+                    {/* 관리 모드 토글 및 삭제 버튼 */}
+                    <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '8px' }}>
+                        {isEditMode && selectedToDelete.length > 0 && (
+                            <button
+                                onClick={handleDeleteProducts}
+                                className="btn-primary"
+                                style={{
+                                    background: '#ef4444',
+                                    padding: '8px 16px',
+                                    fontSize: '14px'
+                                }}
+                            >
+                                삭제 ({selectedToDelete.length})
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setIsEditMode(!isEditMode)}
+                            className="glass-card"
+                            style={{
+                                padding: '8px 16px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                color: isEditMode ? '#a78bfa' : 'var(--text-secondary)',
+                                borderColor: isEditMode ? '#a78bfa' : 'transparent'
+                            }}
+                        >
+                            {isEditMode ? '완료' : '관리'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* 제품 그리드 */}
@@ -544,11 +618,45 @@ export default function ProductsPage() {
                 ) : products.length > 0 ? (
                     <div className="product-grid">
                         {products.map(product => (
-                            <ProductCard
-                                key={product.id}
-                                product={product}
-                                onVideoPlay={handleVideoPlay}
-                            />
+                            <div key={product.id} style={{ position: 'relative' }}>
+                                <ProductCard
+                                    product={product}
+                                    onVideoPlay={(p) => {
+                                        if (isEditMode) {
+                                            toggleSelectProduct(p.id);
+                                        } else {
+                                            handleVideoPlay(p);
+                                        }
+                                    }}
+                                />
+                                {isEditMode && (
+                                    <div
+                                        onClick={() => toggleSelectProduct(product.id)}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '12px',
+                                            left: '12px',
+                                            zIndex: 20,
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '6px',
+                                            background: selectedToDelete.includes(product.id) ? '#8b5cf6' : 'rgba(0,0,0,0.5)',
+                                            border: '2px solid white',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {selectedToDelete.includes(product.id) && (
+                                            <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         ))}
                     </div>
                 ) : (

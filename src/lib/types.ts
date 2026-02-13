@@ -18,6 +18,7 @@ export interface Product {
   imageUrl: string;
   fabric: string;
   gender: Gender;
+  category?: string; // New field
   colors: ColorStock[];
   sizes: SizeStock[];
   videoUrl: string | null;
@@ -31,6 +32,7 @@ export interface ProductInput {
   imageBase64: string;
   fabric: string;
   gender: Gender;
+  category?: string; // New field
   colorsText: string;
   sizesText: string;
 }

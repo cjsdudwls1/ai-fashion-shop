@@ -176,7 +176,7 @@ async function callVirtualTryOn(
 // ============================================================================
 async function callImageToVideo(
     imageUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
 ): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
     console.log(`[Kling] ===== 2단계: Image-to-Video (Sound Off: 화질 우선) =====`);
     console.log(`[Kling] 입력 이미지: ${imageUrl.substring(0, 80)}...`);
@@ -185,8 +185,9 @@ async function callImageToVideo(
     // 한글 텍스트 제거 및 purely visual prompt 사용
     // productInfo.gender가 'male'/'female'이므로 그대로 사용하거나 영문으로 매핑
     const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
+    const categoryStr = productInfo.category ? ` ${productInfo.category}` : '';
 
-    const prompt = `A professional ${genderStr} fashion model wearing ${productInfo.name} in a studio with soft lighting. The model turns to show the ${productInfo.fabric} fabric texture. High quality, 4K, cinematic fashion video.`;
+    const prompt = `A professional ${genderStr} fashion model wearing ${productInfo.name}${categoryStr} in a studio with soft lighting. The model turns to show the ${productInfo.fabric} fabric texture. High quality, 4K, cinematic fashion video.`;
 
     console.log(`[Kling] 프롬프트: ${prompt}`);
 
@@ -241,7 +242,7 @@ async function callImageToVideo(
 // kling-v2-6 실패 시 폴백
 async function callImageToVideoFallback(
     imageUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
 ): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
     console.log(`[Kling] === 폴백: kling-v1-6 ===`);
     const genderText = productInfo.gender === 'female' ? '여성' : '남성';
@@ -289,7 +290,7 @@ async function callImageToVideoFallback(
 export async function generateProductVideo(
     productId: string,
     imageBase64OrUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
 ): Promise<void> {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`[AI Service] 영상+음성 생성 시작: ${productId}`);
@@ -299,7 +300,7 @@ export async function generateProductVideo(
     console.log(`${'='.repeat(60)}\n`);
 
     try {
-        productStore.updateVideoStatus(productId, 'generating');
+        await productStore.updateVideoStatus(productId, 'generating');
 
         // ===== 1단계: Virtual Try-On =====
         const tryOnResult = await callVirtualTryOn(imageBase64OrUrl, productInfo.gender);
@@ -339,7 +340,7 @@ export async function generateProductVideo(
 
         // ===== 결과 저장 =====
         if (videoResult.success && videoResult.videoUrl) {
-            productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl);
+            await productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl);
             console.log(`\n${'='.repeat(60)}`);
             console.log(`[AI Service] 영상+음성 생성 완료!`);
             console.log(`[AI Service] 비디오 URL: ${videoResult.videoUrl.substring(0, 80)}...`);
@@ -347,16 +348,16 @@ export async function generateProductVideo(
             console.log(`${'='.repeat(60)}\n`);
         } else {
             // 영상 실패해도 TTS 오디오가 있으면 함께 저장 (나중에 영상 재생성 시 활용)
-            productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl);
+            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl);
             const errorMsg = `영상 생성 실패: ${videoResult.error}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
             console.error(`\n[AI Service] ${errorMsg}\n`);
             throw new Error(errorMsg);
         }
     } catch (error) {
         // 이미 updateVideoStatus가 호출되지 않은 경우에만 실패 처리
-        const product = productStore.getProduct(productId);
+        const product = await productStore.getProduct(productId);
         if (product && product.videoStatus === 'generating') {
-            productStore.updateVideoStatus(productId, 'failed');
+            await productStore.updateVideoStatus(productId, 'failed');
         }
         console.error(`[AI Service] 오류:`, error);
         throw error; // 호출부에서 성공/실패 판단 가능

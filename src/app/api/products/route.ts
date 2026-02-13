@@ -15,7 +15,7 @@ function generateId(): string {
 // GET: 전체 상품 조회
 export async function GET() {
     try {
-        const products = productStore.getAllProducts();
+        const products = await productStore.getAllProducts();
         return NextResponse.json({ products });
     } catch (error) {
         console.error('상품 조회 오류:', error);
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
             imageUrl: body.imageBase64, // Base64 이미지 직접 저장
             fabric: body.fabric,
             gender,
+            category: body.category, // New field
             colors,
             sizes,
             videoUrl: null,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         };
 
         // 저장소에 추가
-        productStore.addProduct(newProduct);
+        await productStore.addProduct(newProduct);
         console.log(`[Product] 새 상품 등록: ${productId} - ${body.name} (${gender === 'female' ? '여성복' : '남성복'})`);
 
         // AI 영상 생성 자동 트리거 (비동기 - 응답 대기 안 함)
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
                 name: body.name,
                 fabric: body.fabric,
                 gender,
+                category: body.category, // Pass category for prompt generation
             }).then(() => {
                 console.log(`[Product] AI 영상+음성 생성 완료`);
             }).catch(err => {
@@ -95,6 +97,45 @@ export async function POST(request: NextRequest) {
         console.error('상품 등록 오류:', error);
         return NextResponse.json(
             { error: '상품 등록 중 오류가 발생했습니다.' },
+            { status: 500 }
+        );
+    }
+}
+// DELETE: 상품 삭제 (단일 또는 다중)
+export async function DELETE(request: NextRequest) {
+    try {
+        const { ids } = await request.json();
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json(
+                { error: '삭제할 상품 ID 목록이 필요합니다.' },
+                { status: 400 }
+            );
+        }
+
+        const results = await Promise.all(
+            ids.map(id => productStore.deleteProduct(id))
+        );
+
+        const successCount = results.filter(Boolean).length;
+
+        if (successCount === 0) {
+            return NextResponse.json(
+                { error: '상품 삭제에 실패했습니다.' },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: `${successCount}개의 상품이 삭제되었습니다.`,
+            deletedCount: successCount
+        });
+
+    } catch (error) {
+        console.error('상품 삭제 오류:', error);
+        return NextResponse.json(
+            { error: '상품 삭제 중 오류가 발생했습니다.' },
             { status: 500 }
         );
     }
