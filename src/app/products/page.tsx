@@ -61,6 +61,21 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                             <div className="spinner" />
                             <span style={{ color: 'white', fontSize: '14px' }}>영상 생성 중...</span>
                         </div>
+                    ) : product.videoStatus === 'failed' ? (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 16px',
+                            borderRadius: '9999px',
+                            background: 'rgba(239, 68, 68, 0.8)', // Red background
+                            backdropFilter: 'blur(8px)'
+                        }}>
+                            <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>영상 생성 실패</span>
+                        </div>
                     ) : null}
                 </div>
 
@@ -86,6 +101,9 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                     )}
                     {product.videoStatus === 'pending' && (
                         <span className="badge badge-info" style={{ fontSize: '11px', flexShrink: 0 }}>대기 중</span>
+                    )}
+                    {product.videoStatus === 'failed' && (
+                        <span className="badge badge-primary" style={{ fontSize: '11px', flexShrink: 0, backgroundColor: '#ef4444', color: 'white' }}>영상 생성 실패</span>
                     )}
                 </div>
 
@@ -496,7 +514,9 @@ export default function ProductsPage() {
     // 제품 목록 가져오기
     const fetchProducts = useCallback(async () => {
         try {
-            const response = await fetch('/api/products');
+            const response = await fetch(`/api/products?t=${Date.now()}`, {
+                headers: { 'Cache-Control': 'no-cache' }
+            });
             const data = await response.json();
             setProducts(data.products || []);
         } catch (error) {
@@ -543,6 +563,7 @@ export default function ProductsPage() {
         if (!confirm(`${selectedToDelete.length}개의 상품을 정말 삭제하시겠습니까?`)) return;
 
         try {
+            setLoading(true); // 로딩 표시
             const response = await fetch('/api/products', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
@@ -550,18 +571,18 @@ export default function ProductsPage() {
             });
 
             if (response.ok) {
-                // 삭제 성공 시 목록 갱신 및 선택 초기화
-                await fetchProducts();
-                setSelectedToDelete([]);
-                setIsEditMode(false);
                 alert('삭제되었습니다.');
+                // 사용자의 요청대로 "새로 고침"하여 데이터 정합성 확실히 보장
+                window.location.reload();
             } else {
                 const data = await response.json();
                 alert(data.error || '삭제 중 오류가 발생했습니다.');
+                setLoading(false);
             }
         } catch (error) {
             console.error('삭제 오류:', error);
             alert('삭제 중 오류가 발생했습니다.');
+            setLoading(false);
         }
     };
 

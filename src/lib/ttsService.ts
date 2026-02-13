@@ -15,9 +15,9 @@ const ELEVENLABS_MODEL = 'eleven_multilingual_v2'; // 한국어 포함 29개 언
 // 음성 ID (성별에 따라 다른 음성 사용)
 // ElevenLabs 기본 제공 음성 (premade voices)
 const VOICE_OPTIONS: Record<string, { id: string; name: string }> = {
-    female: { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice' },    // 명확하고 교육적인 여성 음성
-    male: { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George' },      // 따뜻하고 매력적인 남성 음성
-    neutral: { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River' },    // 편안하고 중립적인 음성
+    female: { id: 'AW5wrnG1jVizOYY7R1Oo', name: 'JiYoung' },    // 친근하고 맑은 톤 (교육/쇼핑몰 추천)
+    male: { id: 'Ir7oQcBXWiq4oFGROCfj', name: 'Taemin' },      // 따뜻하고 자연스러운 톤 (내레이션)
+    neutral: { id: 'uyVNoMrnUku1dZyVEXwD', name: 'Anna Kim' }, // 부드럽고 차분한 목소리
 };
 
 // ============================================================================
