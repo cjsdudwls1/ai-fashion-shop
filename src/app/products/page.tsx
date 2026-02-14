@@ -62,19 +62,30 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                             <span style={{ color: 'white', fontSize: '14px' }}>영상 생성 중...</span>
                         </div>
                     ) : product.videoStatus === 'failed' ? (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '9999px',
-                            background: 'rgba(239, 68, 68, 0.8)', // Red background
-                            backdropFilter: 'blur(8px)'
-                        }}>
+                        <div
+                            title={product.videoErrorReason || '알 수 없는 오류'}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                borderRadius: '9999px',
+                                background: 'rgba(239, 68, 68, 0.9)', // Red background
+                                backdropFilter: 'blur(8px)',
+                                cursor: 'help'
+                            }}
+                        >
                             <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>영상 생성 실패</span>
+                            <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>
+                                영상 생성 실패
+                                {product.videoErrorReason && (
+                                    <span style={{ fontSize: '11px', display: 'block', fontWeight: '400', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {product.videoErrorReason.includes('pixel') ? '이미지 포맷 오류' : product.videoErrorReason}
+                                    </span>
+                                )}
+                            </span>
                         </div>
                     ) : null}
                 </div>
@@ -103,7 +114,19 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                         <span className="badge badge-info" style={{ fontSize: '11px', flexShrink: 0 }}>대기 중</span>
                     )}
                     {product.videoStatus === 'failed' && (
-                        <span className="badge badge-primary" style={{ fontSize: '11px', flexShrink: 0, backgroundColor: '#ef4444', color: 'white' }}>영상 생성 실패</span>
+                        <span
+                            className="badge badge-primary"
+                            title={product.videoErrorReason || '알 수 없는 오류'}
+                            style={{
+                                fontSize: '11px',
+                                flexShrink: 0,
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                cursor: 'help'
+                            }}
+                        >
+                            실패: {product.videoErrorReason ? (product.videoErrorReason.length > 10 ? product.videoErrorReason.substring(0, 10) + '...' : product.videoErrorReason) : '오류'}
+                        </span>
                     )}
                 </div>
 
@@ -537,11 +560,13 @@ export default function ProductsPage() {
     const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
 
     const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 카테고리 필터
+    const [viewMode, setViewMode] = useState<'gallery' | 'trash'>('gallery'); // 보기 모드
 
     // 제품 목록 가져오기
     const fetchProducts = useCallback(async () => {
         try {
-            const response = await fetch(`/api/products?t=${Date.now()}`, {
+            const endpoint = `/api/products?t=${Date.now()}&status=${viewMode === 'trash' ? 'trash' : 'active'}`;
+            const response = await fetch(endpoint, {
                 headers: { 'Cache-Control': 'no-cache' }
             });
             const data = await response.json();
@@ -551,7 +576,7 @@ export default function ProductsPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [viewMode]);
 
     // 카테고리 필터링
     const filteredProducts = products.filter(product => {
@@ -610,32 +635,69 @@ export default function ProductsPage() {
         });
     };
 
-    // 선택된 제품 삭제
+    // 제품 삭제 처리 (휴지통 이동 또는 영구 삭제)
     const handleDeleteProducts = async () => {
         if (selectedToDelete.length === 0) return;
 
-        if (!confirm(`${selectedToDelete.length}개의 상품을 정말 삭제하시겠습니까?`)) return;
+        const isTrash = viewMode === 'trash';
+        const message = isTrash
+            ? '선택한 상품을 영구 삭제하시겠습니까? 복구할 수 없습니다.'
+            : '선택한 상품을 휴지통으로 이동하시겠습니까?';
 
+        if (!confirm(message)) return;
+
+        setLoading(true);
         try {
-            setLoading(true); // 로딩 표시
-            const response = await fetch('/api/products', {
+            const url = isTrash
+                ? '/api/products?action=permanent'
+                : '/api/products'; // 기본은 soft delete
+
+            const response = await fetch(url, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: selectedToDelete })
             });
 
             if (response.ok) {
-                alert('삭제되었습니다.');
-                // 사용자의 요청대로 "새로 고침"하여 데이터 정합성 확실히 보장
-                window.location.reload();
+                alert(isTrash ? '영구 삭제되었습니다.' : '휴지통으로 이동되었습니다.');
+                setSelectedToDelete([]);
+                setIsEditMode(false);
+                fetchProducts();
             } else {
-                const data = await response.json();
-                alert(data.error || '삭제 중 오류가 발생했습니다.');
+                alert('작업 실패');
                 setLoading(false);
             }
         } catch (error) {
             console.error('삭제 오류:', error);
-            alert('삭제 중 오류가 발생했습니다.');
+            alert('오류가 발생했습니다.');
+            setLoading(false);
+        }
+    };
+
+    // 제품 복구 처리
+    const handleRestoreProducts = async () => {
+        if (selectedToDelete.length === 0) return;
+        if (!confirm('선택한 상품을 복구하시겠습니까?')) return;
+
+        setLoading(true);
+        try {
+            const response = await fetch('/api/products?action=restore', {
+                method: 'DELETE', // API 설계상 DELETE 메서드 사용 중 (쿼리 파라미터로 구분)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedToDelete })
+            });
+
+            if (response.ok) {
+                alert('복구되었습니다.');
+                setSelectedToDelete([]);
+                fetchProducts();
+            } else {
+                alert('복구 실패');
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('복구 오류:', error);
+            alert('오류가 발생했습니다.');
             setLoading(false);
         }
     };
@@ -646,11 +708,53 @@ export default function ProductsPage() {
                 {/* 헤더 */}
                 <div style={{ textAlign: 'center', marginBottom: '48px', position: 'relative' }}>
                     <h1 className="text-hero" style={{ marginBottom: '12px' }}>
-                        <span className="text-gradient">제품 갤러리</span>
+                        <span className="text-gradient">
+                            {viewMode === 'trash' ? '휴지통' : '제품 갤러리'}
+                        </span>
                     </h1>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-                        AI가 소개하는 프리미엄 패션 아이템
+                        {viewMode === 'trash'
+                            ? '삭제된 상품은 1일 후 영구 삭제됩니다.'
+                            : 'AI가 소개하는 프리미엄 패션 아이템'}
                     </p>
+
+                    {/* 보기 모드 전환 (휴지통 <-> 갤러리) */}
+                    <div style={{ position: 'absolute', top: 0, left: 0 }}>
+                        <button
+                            onClick={() => {
+                                setViewMode(viewMode === 'gallery' ? 'trash' : 'gallery');
+                                setSelectedCategory('all');
+                                setIsEditMode(false);
+                                setSelectedToDelete([]);
+                            }}
+                            className="glass-card"
+                            style={{
+                                padding: '8px 12px',
+                                fontSize: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                cursor: 'pointer',
+                                color: viewMode === 'trash' ? '#ef4444' : 'var(--text-secondary)'
+                            }}
+                        >
+                            {viewMode === 'gallery' ? (
+                                <>
+                                    <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    휴지통 보기
+                                </>
+                            ) : (
+                                <>
+                                    <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    </svg>
+                                    갤러리 보기
+                                </>
+                            )}
+                        </button>
+                    </div>
 
                     {/* 카테고리 필터 바 */}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
@@ -677,7 +781,24 @@ export default function ProductsPage() {
 
                     {/* 관리 모드 토글 및 삭제 버튼 - 우측 상단 배치 */}
                     <div style={{ position: 'absolute', top: '0', right: '0', display: 'flex', gap: '8px' }}>
-                        {isEditMode && selectedToDelete.length > 0 && (
+                        {/* 복구 버튼 (휴지통 모드일 때만) */}
+                        {viewMode === 'trash' && selectedToDelete.length > 0 && (
+                            <button
+                                onClick={handleRestoreProducts}
+                                className="badge badge-success"
+                                style={{
+                                    border: 'none', cursor: 'pointer', padding: '8px 16px', fontSize: '12px',
+                                    display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                            >
+                                <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                복구 ({selectedToDelete.length})
+                            </button>
+                        )}
+
+                        {(isEditMode || viewMode === 'trash') && selectedToDelete.length > 0 && (
                             <button
                                 onClick={handleDeleteProducts}
                                 className="badge badge-primary"
@@ -689,7 +810,7 @@ export default function ProductsPage() {
                                 <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                삭제 ({selectedToDelete.length})
+                                {viewMode === 'trash' ? `영구 삭제 (${selectedToDelete.length})` : `삭제 (${selectedToDelete.length})`}
                             </button>
                         )}
 
@@ -704,11 +825,12 @@ export default function ProductsPage() {
                                 borderRadius: '8px',
                                 padding: '8px',
                                 cursor: 'pointer',
-                                color: isEditMode ? 'var(--primary-color)' : 'var(--text-secondary)',
+                                color: (isEditMode || viewMode === 'trash') ? 'var(--primary-color)' : 'var(--text-secondary)',
                                 transition: 'all 0.2s'
                             }}
                             title={isEditMode ? '편집 종료' : '편집 모드'}
                         >
+                            {/* 휴지통 모드에서는 항상 편집 모드처럼 동작하거나, 아이콘 변경 */}
                             <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 {isEditMode ? (
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -732,17 +854,28 @@ export default function ProductsPage() {
                         <div className="product-grid">
                             {products.map(product => (
                                 <div key={product.id} style={{ position: 'relative' }}>
+                                    {(isEditMode || viewMode === 'trash') && (
+                                        <div
+                                            onClick={() => toggleSelectProduct(product.id)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '0', left: '0', right: '0', bottom: '0',
+                                                zIndex: 10,
+                                                cursor: 'pointer'
+                                            }}
+                                        />
+                                    )}
                                     <ProductCard
                                         product={product}
                                         onVideoPlay={(p) => {
-                                            if (isEditMode) {
+                                            if (isEditMode || viewMode === 'trash') {
                                                 toggleSelectProduct(p.id);
                                             } else {
                                                 handleVideoPlay(p);
                                             }
                                         }}
                                     />
-                                    {isEditMode && (
+                                    {(isEditMode || viewMode === 'trash') && (
                                         <div
                                             onClick={() => toggleSelectProduct(product.id)}
                                             style={{

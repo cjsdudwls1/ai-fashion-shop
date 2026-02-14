@@ -13,9 +13,18 @@ function generateId(): string {
 }
 
 // GET: 전체 상품 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const products = await productStore.getAllProducts();
+        const { searchParams } = new URL(request.url);
+        const status = searchParams.get('status');
+
+        let products;
+        if (status === 'trash') {
+            products = await productStore.getTrashProducts();
+        } else {
+            products = await productStore.getAllProducts();
+        }
+
         return NextResponse.json({ products });
     } catch (error) {
         console.error('상품 조회 오류:', error);
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
             generateProductVideo(productId, body.imageBase64, {
                 name: body.name,
                 fabric: body.fabric,
-                gender,
+                gender: body.gender as 'female' | 'male' | 'unisex',
                 category: body.category, // Pass category for prompt generation
                 narrationText: body.narrationText, // Pass custom narration
             }).then(() => {
@@ -114,23 +123,35 @@ export async function DELETE(request: NextRequest) {
             );
         }
 
+        const { searchParams } = new URL(request.url);
+        const action = searchParams.get('action'); // 'restore' | 'permanent' | undefined
+
         const results = await Promise.all(
-            ids.map(id => productStore.deleteProduct(id))
+            ids.map(id => {
+                if (action === 'restore') {
+                    return productStore.restoreProduct(id);
+                } else if (action === 'permanent') {
+                    return productStore.permanentDeleteProduct(id);
+                } else {
+                    return productStore.deleteProduct(id);
+                }
+            })
         );
 
         const successCount = results.filter(Boolean).length;
+        const actionName = action === 'restore' ? '복구' : (action === 'permanent' ? '영구 삭제' : '삭제');
 
         if (successCount === 0) {
             return NextResponse.json(
-                { error: '상품 삭제에 실패했습니다.' },
+                { error: `상품 ${actionName}에 실패했습니다.` },
                 { status: 500 }
             );
         }
 
         return NextResponse.json({
             success: true,
-            message: `${successCount}개의 상품이 삭제되었습니다.`,
-            deletedCount: successCount
+            message: `${successCount}개의 상품이 ${actionName}되었습니다.`,
+            count: successCount
         });
 
     } catch (error) {

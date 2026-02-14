@@ -124,7 +124,7 @@ function isBase64Image(str: string): boolean {
 // ============================================================================
 async function callVirtualTryOn(
     clothImageInput: string,
-    gender: Gender
+    gender: 'male' | 'female'
 ): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
     console.log(`[Kling] ===== 1단계: Virtual Try-On =====`);
     console.log(`[Kling] 모델: ${gender === 'female' ? '여성' : '남성'}`);
@@ -304,8 +304,24 @@ export async function generateProductVideo(
     try {
         await productStore.updateVideoStatus(productId, 'generating');
 
+        // ===== 남녀공용(Unisex) 확률 로직 =====
+        let targetGender: 'female' | 'male' = 'female'; // Default
+
+        if (productInfo.gender === 'unisex') {
+            const isFemale = Math.random() < 0.75; // 75% 확률로 여성
+            targetGender = isFemale ? 'female' : 'male';
+            console.log(`[AI Service] 남녀공용(Unisex) 감지됨 → ${targetGender === 'female' ? '여성' : '남성'} 모델로 결정 (75:25 확률)`);
+        } else {
+            targetGender = productInfo.gender;
+        }
+
+        const productInfoForGeneration = {
+            ...productInfo,
+            gender: targetGender
+        };
+
         // ===== 1단계: Virtual Try-On =====
-        const tryOnResult = await callVirtualTryOn(imageBase64OrUrl, productInfo.gender);
+        const tryOnResult = await callVirtualTryOn(imageBase64OrUrl, targetGender);
 
         let imageForVideo: string;
         if (tryOnResult.success && tryOnResult.imageUrl) {
@@ -322,14 +338,14 @@ export async function generateProductVideo(
         }
 
         // ===== 2단계: Image-to-Video (무음 - 화질 우선) =====
-        const videoResult = await callImageToVideo(imageForVideo, productInfo);
+        const videoResult = await callImageToVideo(imageForVideo, productInfoForGeneration);
 
         // ===== 3단계: ElevenLabs TTS 나레이션 생성 (2단계와 독립) =====
         // 비디오 생성과 병렬로 실행할 수도 있지만, 순차 실행으로 안정성 확보
         let audioDataUrl: string | undefined;
         console.log(`\n[AI Service] ===== 3단계: ElevenLabs TTS 나레이션 생성 =====`);
         try {
-            const ttsResult = await generateProductNarration(productInfo, productInfo.narrationText);
+            const ttsResult = await generateProductNarration(productInfoForGeneration, productInfo.narrationText);
             if (ttsResult.success && ttsResult.audioBase64 && ttsResult.mimeType) {
                 audioDataUrl = audioToDataUrl(ttsResult.audioBase64, ttsResult.mimeType);
                 console.log(`[AI Service] 3단계 결과: TTS 생성 성공 (${Math.round(ttsResult.audioBase64.length / 1024)}KB)`);
@@ -350,16 +366,21 @@ export async function generateProductVideo(
             console.log(`${'='.repeat(60)}\n`);
         } else {
             // 영상 실패해도 TTS 오디오가 있으면 함께 저장 (나중에 영상 재생성 시 활용)
-            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl);
-            const errorMsg = `영상 생성 실패: ${videoResult.error}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
-            console.error(`\n[AI Service] ${errorMsg}\n`);
-            throw new Error(errorMsg);
+            const errorMsg = videoResult.error || '알 수 없는 오류';
+            // audioDataUrl은 실패해도 저장하지 않고, 실패 원인만 저장하도록 변경하거나, 오디오도 저장하고 싶다면 인자를 맞춰서 전달
+            // updateVideoStatus(id, status, videoUrl, audioUrl, errorReason)
+            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl, errorMsg);
+
+            const detailedMsg = `영상 생성 실패: ${errorMsg}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
+            console.error(`\n[AI Service] ${detailedMsg}\n`);
+            throw new Error(detailedMsg);
         }
     } catch (error) {
         // 이미 updateVideoStatus가 호출되지 않은 경우에만 실패 처리
         const product = await productStore.getProduct(productId);
         if (product && product.videoStatus === 'generating') {
-            await productStore.updateVideoStatus(productId, 'failed');
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg);
         }
         console.error(`[AI Service] 오류:`, error);
         throw error; // 호출부에서 성공/실패 판단 가능

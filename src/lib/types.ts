@@ -10,7 +10,7 @@ export interface SizeStock {
   quantity: number;
 }
 
-export type Gender = 'female' | 'male';
+export type Gender = 'female' | 'male' | 'unisex';
 
 export interface Product {
   id: string;
@@ -24,7 +24,9 @@ export interface Product {
   videoUrl: string | null;
   audioUrl: string | null;       // TTS 나레이션 오디오 (Base64 Data URL)
   videoStatus: 'pending' | 'generating' | 'completed' | 'failed';
+  videoErrorReason?: string; // New field for error message
   createdAt: Date;
+  deletedAt?: Date | null; // For soft delete
 }
 
 export interface ProductInput {

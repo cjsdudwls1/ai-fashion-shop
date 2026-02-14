@@ -53,7 +53,7 @@ export async function generateTTS(
     text: string,
     gender: Gender = 'female'
 ): Promise<TTSResult> {
-    // 성별에 맞는 풀에서 랜덤 선택 (기본값: female)
+    // 성별에 맞는 풀에서 랜덤 선택 (unisex인 경우 female 풀 사용)
     const pool = VOICE_POOLS[gender] || VOICE_POOLS.female;
     const voiceId = pool[Math.floor(Math.random() * pool.length)];
 

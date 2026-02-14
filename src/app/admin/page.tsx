@@ -40,8 +40,8 @@ export default function AdminPage() {
     const [formData, setFormData] = useState({
         name: '',
         fabric: '',
-        gender: 'female' as 'female' | 'male',
-        category: 'short-sleeve', // Default category
+        gender: 'female' as 'female' | 'male' | 'unisex',
+        category: '', // Default category
     });
 
     // 재고 관리 상태
@@ -217,10 +217,10 @@ export default function AdminPage() {
         e.preventDefault();
         setError(null);
 
-        if (!formData.name.trim()) return setError('Please enter a product name.');
-        if (!imageBase64) return setError('Please upload a product image.');
-        if (!formData.fabric.trim()) return setError('Please enter material info.');
-        if (stockList.length === 0) return setError('Please add at least one variant.');
+        if (!formData.name.trim()) return setError('상품명을 입력해주세요.');
+        if (!imageBase64) return setError('상품 이미지를 업로드해주세요.');
+        if (!formData.fabric.trim()) return setError('소재 정보를 입력해주세요.');
+        if (stockList.length === 0) return setError('최소 하나 이상의 재고를 추가해주세요.');
 
         setIsSubmitting(true);
 
@@ -333,9 +333,9 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Main Column (Left - 2/3) */}
-                    <div className="lg:col-span-2 space-y-6">
+                <div className="max-w-3xl mx-auto space-y-8">
+                    {/* Main Column (Centered) */}
+                    <div className="space-y-6">
 
                         {/* Card 2: Media */}
                         <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -417,7 +417,78 @@ export default function AdminPage() {
                                     }}
                                 />
                             </div>
+
+                            {/* Gender Selection */}
+                            <div style={{ marginTop: '24px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>성별 (Gender)</label>
+                                <div style={{ display: 'flex', gap: '16px' }}>
+                                    {[
+                                        { value: 'female', label: '여성 (Female)' },
+                                        { value: 'male', label: '남성 (Male)' },
+                                        { value: 'unisex', label: '남녀공용 (Unisex)' }
+                                    ].map((option) => (
+                                        <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                                            <input
+                                                type="radio"
+                                                name="gender"
+                                                value={option.value}
+                                                checked={formData.gender === option.value}
+                                                onChange={handleInputChange}
+                                                style={{ accentColor: 'var(--primary-color)' }}
+                                            />
+                                            {option.label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Category Selection */}
+                            <div style={{ marginTop: '24px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>카테고리 (Category)</label>
+                                <select
+                                    name="category"
+                                    value={formData.category}
+                                    onChange={handleInputChange}
+                                    style={{
+                                        width: '100%', padding: '12px', borderRadius: '8px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-elevated)', fontSize: '14px',
+                                        color: 'var(--text-primary)', cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="" disabled>카테고리를 선택해주세요 (Select Category)</option>
+                                    <optgroup label="상의 (Tops)">
+                                        <option value="short-sleeve">반팔 (Short Sleeve)</option>
+                                        <option value="long-sleeve">긴팔 (Long Sleeve)</option>
+                                        <option value="sleeveless">민소매 (Sleeveless)</option>
+                                        <option value="shirt">셔츠/블라우스 (Shirt)</option>
+                                        <option value="knit">니트/스웨터 (Knit)</option>
+                                        <option value="hoodie">후드/맨투맨 (Hoodie)</option>
+                                    </optgroup>
+                                    <optgroup label="하의 (Bottoms)">
+                                        <option value="pants">긴바지 (Pants)</option>
+                                        <option value="shorts">반바지 (Shorts)</option>
+                                        <option value="skirt">스커트 (Skirt)</option>
+                                        <option value="denim">데님/청바지 (Denim)</option>
+                                        <option value="slacks">슬랙스 (Slacks)</option>
+                                    </optgroup>
+                                    <optgroup label="아우터 (Outerwear)">
+                                        <option value="jacket">재킷/점퍼 (Jacket)</option>
+                                        <option value="coat">코트 (Coat)</option>
+                                        <option value="padding">패딩 (Padding)</option>
+                                        <option value="cardigan">가디건 (Cardigan)</option>
+                                    </optgroup>
+                                    <optgroup label="기타 (Others)">
+                                        <option value="onepiece">원피스 (Dress)</option>
+                                        <option value="set">세트/투피스 (Set)</option>
+                                        <option value="underwear">속옷/언더웨어 (Underwear)</option>
+                                        <option value="etc">기타/액세서리 (Etc)</option>
+                                    </optgroup>
+
+                                </select>
+                            </div>
                         </div>
+
 
                         {/* Card: Narration Script (Moved) */}
                         <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -545,7 +616,7 @@ export default function AdminPage() {
                         {/* Card 3: Variants */}
                         <div className="glass-card" style={{ padding: '0px', overflow: 'hidden', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600 }}>재고 및 옵션 (Variants)</h3>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600 }}>재고 (Stock)</h3>
                                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{stockList.length}개 옵션 추가됨</span>
                             </div>
 
@@ -676,88 +747,9 @@ export default function AdminPage() {
                             </div>
                         </div>
 
-                    </div>
 
-                    {/* Secondary Column (Right - 1/3) */}
-                    <div className="space-y-6">
-                        {/* Card 4: Organization */}
-                        <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '20px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상품 분류 (Organization)</h3>
 
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>성별 (Gender)</label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {['female', 'male'].map((g) => (
-                                        <label key={g} style={{
-                                            display: 'flex', alignItems: 'center', gap: '12px',
-                                            cursor: 'pointer', padding: '10px 12px',
-                                            borderRadius: '8px',
-                                            border: formData.gender === g ? '1px solid var(--text-primary)' : '1px solid transparent',
-                                            background: formData.gender === g ? 'var(--bg-elevated)' : 'transparent',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                            <input
-                                                type="radio"
-                                                name="gender"
-                                                value={g}
-                                                checked={formData.gender === g}
-                                                onChange={handleInputChange}
-                                                style={{ accentColor: 'var(--text-primary)' }}
-                                            />
-                                            <span style={{ fontSize: '14px', fontWeight: formData.gender === g ? 600 : 400 }}>{g === 'female' ? '여성 (Women)' : '남성 (Men)'}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
 
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>카테고리 (Category)</label>
-                                <select
-                                    name="category"
-                                    value={formData.category}
-                                    onChange={handleInputChange}
-                                    style={{
-                                        width: '100%', padding: '10px 12px', borderRadius: '8px',
-                                        border: '1px solid var(--border-color)',
-                                        background: 'var(--bg-elevated)', fontSize: '14px',
-                                        color: 'var(--text-primary)', cursor: 'pointer'
-                                    }}
-                                >
-                                    <optgroup label="상의 (Tops)">
-                                        <option value="short-sleeve">반팔 (Short Sleeve)</option>
-                                        <option value="long-sleeve">긴팔 (Long Sleeve)</option>
-                                        <option value="sleeveless">민소매 (Sleeveless)</option>
-                                        <option value="shirt">셔츠/블라우스 (Shirt)</option>
-                                        <option value="knit">니트/스웨터 (Knit)</option>
-                                        <option value="hoodie">후드/맨투맨 (Hoodie)</option>
-                                    </optgroup>
-                                    <optgroup label="하의 (Bottoms)">
-                                        <option value="pants">긴바지 (Pants)</option>
-                                        <option value="shorts">반바지 (Shorts)</option>
-                                        <option value="skirt">스커트 (Skirt)</option>
-                                        <option value="denim">데님/청바지 (Denim)</option>
-                                        <option value="slacks">슬랙스 (Slacks)</option>
-                                    </optgroup>
-                                    <optgroup label="아우터 (Outerwear)">
-                                        <option value="jacket">재킷/점퍼 (Jacket)</option>
-                                        <option value="coat">코트 (Coat)</option>
-                                        <option value="padding">패딩 (Padding)</option>
-                                        <option value="cardigan">가디건 (Cardigan)</option>
-                                    </optgroup>
-                                    <optgroup label="기타 (Others)">
-                                        <option value="onepiece">원피스 (Dress)</option>
-                                        <option value="set">세트/투피스 (Set)</option>
-                                        <option value="etc">기타/액세서리 (Etc)</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-                                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                                    고객이 상품을 쉽게 찾을 수 있도록 정확한 카테고리를 설정해주세요.
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
