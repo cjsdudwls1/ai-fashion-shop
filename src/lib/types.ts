@@ -33,6 +33,7 @@ export interface ProductInput {
   fabric: string;
   gender: Gender;
   category?: string; // New field
+  narrationText?: string; // New field
   colorsText: string;
   sizesText: string;
 }

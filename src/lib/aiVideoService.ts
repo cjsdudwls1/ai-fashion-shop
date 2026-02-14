@@ -198,7 +198,7 @@ async function callImageToVideo(
         prompt: prompt,
         negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
         mode: 'pro',
-        duration: '5',
+        duration: '10',
         aspect_ratio: '9:16',
         sound: 'off'  // 화질 우선 (오디오 없음)
     };
@@ -256,7 +256,7 @@ async function callImageToVideoFallback(
             negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
             cfg_scale: 0.5,
             mode: 'pro',
-            duration: '5',
+            duration: '10',
             aspect_ratio: '9:16'
         }) as { code?: number; message?: string; data?: { task_id?: string } };
 
@@ -287,10 +287,12 @@ async function callImageToVideoFallback(
 // 통합 함수 - 전체 워크플로우 실행
 // 1) Virtual Try-On → 2) Image-to-Video (무음) → 3) ElevenLabs TTS 나레이션
 // ============================================================================
+// 1) Virtual Try-On → 2) Image-to-Video (무음) → 3) ElevenLabs TTS 나레이션
+// ============================================================================
 export async function generateProductVideo(
     productId: string,
     imageBase64OrUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string; narrationText?: string }
 ): Promise<void> {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`[AI Service] 영상+음성 생성 시작: ${productId}`);
@@ -327,7 +329,7 @@ export async function generateProductVideo(
         let audioDataUrl: string | undefined;
         console.log(`\n[AI Service] ===== 3단계: ElevenLabs TTS 나레이션 생성 =====`);
         try {
-            const ttsResult = await generateProductNarration(productInfo);
+            const ttsResult = await generateProductNarration(productInfo, productInfo.narrationText);
             if (ttsResult.success && ttsResult.audioBase64 && ttsResult.mimeType) {
                 audioDataUrl = audioToDataUrl(ttsResult.audioBase64, ttsResult.mimeType);
                 console.log(`[AI Service] 3단계 결과: TTS 생성 성공 (${Math.round(ttsResult.audioBase64.length / 1024)}KB)`);

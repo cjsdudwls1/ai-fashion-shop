@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent, DragEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getNarrationOptions } from '@/lib/narrationUtils';
 
 // 사전 정의된 색상 목록
 const COMMON_COLORS = [
@@ -55,6 +56,52 @@ export default function AdminPage() {
     const [isDragOver, setIsDragOver] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // 나레이션 관리 상태
+    const [narrationOptions, setNarrationOptions] = useState<string[]>([]);
+    const [selectedNarration, setSelectedNarration] = useState<string>('');
+    const [customNarration, setCustomNarration] = useState<string>('');
+    const [isCustomNarration, setIsCustomNarration] = useState(false);
+
+    // 저장된 스크립트 관리
+    const [savedScripts, setSavedScripts] = useState<string[]>([]);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('savedNarrationScripts');
+        if (saved) {
+            try {
+                setSavedScripts(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to parse saved scripts', e);
+            }
+        }
+    }, []);
+
+    const handleSaveScript = () => {
+        if (!customNarration.trim()) return;
+        // 중복 체크
+        if (savedScripts.includes(customNarration.trim())) {
+            alert('이미 저장된 스크립트입니다.');
+            return;
+        }
+
+        const newScripts = [...savedScripts, customNarration.trim()];
+        setSavedScripts(newScripts);
+        localStorage.setItem('savedNarrationScripts', JSON.stringify(newScripts));
+        alert('스크립트가 저장되었습니다.');
+    };
+
+    const handleDeleteScript = (index: number) => {
+        if (!confirm('정말 삭제하시겠습니까?')) return;
+        const newScripts = savedScripts.filter((_, i) => i !== index);
+        setSavedScripts(newScripts);
+        localStorage.setItem('savedNarrationScripts', JSON.stringify(newScripts));
+    };
+
+    const handleApplyScript = (script: string) => {
+        setCustomNarration(script);
+        // alert('스크립트가 적용되었습니다.'); // 너무 자주 뜨면 귀찮으므로 주석
+    };
+
     // 이미지 파일 처리
     const handleImageFile = (file: File) => {
         if (!file.type.startsWith('image/')) {
@@ -70,6 +117,41 @@ export default function AdminPage() {
             setError(null);
         };
         reader.readAsDataURL(file);
+    };
+
+    // 나레이션 옵션 자동 생성
+    useEffect(() => {
+        // 이름과 소재가 없어도 예시를 보여주기 위해 기본값 사용
+        const nameData = formData.name.trim() || '상품명';
+        const fabricData = formData.fabric.trim() || '소재';
+
+        const options = getNarrationOptions({
+            name: nameData,
+            fabric: fabricData,
+            gender: formData.gender,
+            category: formData.category
+        });
+        setNarrationOptions(options);
+
+        // 현재 선택된 나레이션이 변경된 옵션 목록에 없고, 커스텀 모드도 아니라면 첫 번째 옵션을 자동 선택
+        // 단, 사용자가 명시적으로 선택한 것이 사라지는 것을 방지하기 위해 로직 주의
+        if (!isCustomNarration) {
+            // 이미 선택된 값이 있고, 그것이 새 옵션 목록에 포함되어 있다면 유지
+            if (selectedNarration && options.includes(selectedNarration)) {
+                return;
+            }
+            // 그 외의 경우 (처음 진입, 데이터 변경으로 옵션 내용이 바뀐 경우) 첫 번째 옵션 선택
+            setSelectedNarration(options[0]);
+        }
+    }, [formData.name, formData.fabric, formData.gender, formData.category, isCustomNarration]); // selectedNarration 의존성 제거 (무한 루프 방지)
+
+    const handleNarrationChange = (value: string) => {
+        if (value === 'custom') {
+            setIsCustomNarration(true);
+        } else {
+            setIsCustomNarration(false);
+            setSelectedNarration(value);
+        }
     };
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +250,7 @@ export default function AdminPage() {
                     fabric: formData.fabric,
                     gender: formData.gender,
                     category: formData.category,
+                    narrationText: isCustomNarration ? customNarration : selectedNarration,
                     colorsText,
                     sizesText,
                 }),
@@ -298,6 +381,8 @@ export default function AdminPage() {
                                         }}>
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-secondary)' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                                         </div>
+
+
                                         <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>이미지 업로드</p>
                                         <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>JPEG, PNG, WEBP 파일 지원</p>
                                     </div>
@@ -331,6 +416,129 @@ export default function AdminPage() {
                                         background: 'var(--bg-elevated)', width: '100%'
                                     }}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Card: Narration Script (Moved) */}
+                        <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI 나레이션 스크립트 (Narration Script)</h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {narrationOptions.map((option, idx) => (
+                                    <label
+                                        key={idx}
+                                        style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                            cursor: 'pointer', padding: '12px',
+                                            borderRadius: '8px',
+                                            border: (!isCustomNarration && selectedNarration === option) ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                                            background: (!isCustomNarration && selectedNarration === option) ? 'var(--bg-elevated)' : 'transparent',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onClick={() => {
+                                            setIsCustomNarration(false);
+                                            setSelectedNarration(option);
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                                            border: (!isCustomNarration && selectedNarration === option) ? '5px solid var(--text-primary)' : '1px solid var(--text-secondary)',
+                                            background: 'transparent'
+                                        }} />
+                                        <span style={{ fontSize: '14px', lineHeight: '1.5', color: 'var(--text-primary)' }}>{option}</span>
+                                    </label>
+                                ))}
+
+                                {/* Custom Input Option */}
+                                <label
+                                    style={{
+                                        display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                        cursor: 'pointer', padding: '12px',
+                                        borderRadius: '8px',
+                                        border: isCustomNarration ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                                        background: isCustomNarration ? 'var(--bg-elevated)' : 'transparent',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onClick={() => setIsCustomNarration(true)}
+                                >
+                                    <div style={{
+                                        width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                                        border: isCustomNarration ? '5px solid var(--text-primary)' : '1px solid var(--text-secondary)',
+                                        background: 'transparent'
+                                    }} />
+                                    <div style={{ flex: 1 }}>
+                                        <span style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>직접 입력 (Custom)</span>
+                                        {isCustomNarration && (
+                                            <div style={{ marginTop: '8px' }}>
+                                                <textarea
+                                                    value={customNarration}
+                                                    onChange={(e) => setCustomNarration(e.target.value)}
+                                                    placeholder="원하는 나레이션 문구를 직접 입력하세요..."
+                                                    style={{
+                                                        width: '100%', padding: '10px',
+                                                        borderRadius: '6px', border: '1px solid var(--border-color)',
+                                                        background: 'var(--bg-card)', fontSize: '14px', lineHeight: '1.5',
+                                                        minHeight: '80px', resize: 'vertical'
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()} // Prevent validation triggering
+                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); handleSaveScript(); }}
+                                                        style={{
+                                                            fontSize: '12px', padding: '6px 12px', borderRadius: '6px',
+                                                            background: 'var(--bg-elevated)', border: '1px solid var(--border-color)',
+                                                            cursor: 'pointer', color: 'var(--text-primary)'
+                                                        }}
+                                                    >
+                                                        현재 스크립트 저장 (Save)
+                                                    </button>
+                                                </div>
+
+                                                {/* Saved Scripts List */}
+                                                {savedScripts.length > 0 && (
+                                                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                                                        <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>저장된 스크립트 (Saved Presets)</p>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {savedScripts.map((script, idx) => (
+                                                                <div key={idx} style={{
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    padding: '8px', background: 'var(--bg-elevated)', borderRadius: '6px',
+                                                                    border: '1px solid var(--border-color)'
+                                                                }}>
+                                                                    <div
+                                                                        style={{ flex: 1, fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', marginRight: '8px' }}
+                                                                        onClick={(e) => { e.stopPropagation(); handleApplyScript(script); }}
+                                                                        title={script}
+                                                                    >
+                                                                        {script}
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); handleApplyScript(script); }}
+                                                                            style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: 'var(--primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                                                                        >
+                                                                            적용
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteScript(idx); }}
+                                                                            style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
+                                                                        >
+                                                                            삭제
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </label>
                             </div>
                         </div>
 

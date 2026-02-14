@@ -273,7 +273,13 @@ function VideoModal({ product, onClose }: { product: Product | null; onClose: ()
         const handlePlay = () => {
             setIsPlaying(true);
             if (narrationEnabled) {
-                audio.currentTime = video.currentTime;
+                // 비디오가 끝난 상태에서 다시 재생하면 처음부터
+                if (video.ended) {
+                    audio.currentTime = 0;
+                } else if (Math.abs(audio.currentTime - video.currentTime) > 0.5) {
+                    // 오차 0.5초 이상일 때만 동기화 (오디오 계속 재생 시 끊김 방지)
+                    audio.currentTime = video.currentTime;
+                }
                 audio.play().catch((e) => {
                     console.warn('[VideoModal] 오디오 재생 실패:', e.message);
                 });
@@ -281,30 +287,49 @@ function VideoModal({ product, onClose }: { product: Product | null; onClose: ()
         };
 
         const handlePause = () => {
+            // 비디오가 끝나서 멈춘 경우 오디오는 계속 재생 (단, 오디오가 더 긴 경우)
+            if (video.ended && audio.duration > audio.currentTime) return;
+
             setIsPlaying(false);
             audio.pause();
         };
 
         const handleSeeked = () => {
-            audio.currentTime = video.currentTime;
+            if (!video.ended) {
+                audio.currentTime = video.currentTime;
+            }
         };
 
-        const handleEnded = () => {
+        const handleVideoEnded = () => {
+            // 비디오가 끝나도 오디오가 남아있으면 계속 재생
+            if (audio.duration > audio.currentTime + 0.5) {
+                console.log('[VideoModal] 비디오 종료, 오디오 계속 재생');
+                // isPlaying은 true로 유지하여 React 상태바가 꺼지지 않게 함
+            } else {
+                setIsPlaying(false);
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        };
+
+        const handleAudioEnded = () => {
+            console.log('[VideoModal] 오디오 종료');
             setIsPlaying(false);
-            audio.pause();
-            audio.currentTime = 0;
+            // 오디오가 끝났을 때 비디오도 확실히 멈춤/초기화 필요시 추가
         };
 
         video.addEventListener('play', handlePlay);
         video.addEventListener('pause', handlePause);
         video.addEventListener('seeked', handleSeeked);
-        video.addEventListener('ended', handleEnded);
+        video.addEventListener('ended', handleVideoEnded);
+        audio.addEventListener('ended', handleAudioEnded);
 
         return () => {
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('seeked', handleSeeked);
-            video.removeEventListener('ended', handleEnded);
+            video.removeEventListener('ended', handleVideoEnded);
+            audio.removeEventListener('ended', handleAudioEnded);
         };
     }, [hasNarration, narrationEnabled, audioReady]);
 
@@ -511,6 +536,8 @@ export default function ProductsPage() {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
 
+    const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 카테고리 필터
+
     // 제품 목록 가져오기
     const fetchProducts = useCallback(async () => {
         try {
@@ -525,6 +552,33 @@ export default function ProductsPage() {
             setLoading(false);
         }
     }, []);
+
+    // 카테고리 필터링
+    const filteredProducts = products.filter(product => {
+        if (selectedCategory === 'all') return true;
+        return product.category === selectedCategory;
+    });
+
+    // 존재하는 모든 카테고리 목록 추출 (중복 제거)
+    const availableCategories = ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
+
+    // 카테고리 이름 매핑 (한글 표시용)
+    const categoryNameMap: Record<string, string> = {
+        'all': '전체 (All)',
+        '반팔 (Short Sleeve)': '반팔',
+        '긴팔 (Long Sleeve)': '긴팔',
+        '반바지 (Shorts)': '반바지',
+        '긴바지 (Trousers)': '긴바지',
+        '치마 (Skirt)': '치마',
+        '원피스 (Dress)': '원피스',
+        '아우터 (Outer)': '아우터',
+        '신발 (Shoes)': '신발',
+        // 기타 카테고리는 그대로 표시
+    };
+
+    const getCategoryDisplayName = (cat: string) => {
+        return categoryNameMap[cat] || cat;
+    };
 
     // 초기 로드 및 주기적 폴링 (영상 상태 업데이트 확인)
     useEffect(() => {
@@ -594,125 +648,165 @@ export default function ProductsPage() {
                     <h1 className="text-hero" style={{ marginBottom: '12px' }}>
                         <span className="text-gradient">제품 갤러리</span>
                     </h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
                         AI가 소개하는 프리미엄 패션 아이템
                     </p>
 
-                    {/* 관리 모드 토글 및 삭제 버튼 */}
-                    <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '8px' }}>
+                    {/* 카테고리 필터 바 */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                        {availableCategories.map((cat) => (
+                            <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat || 'all')}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '14px',
+                                    fontWeight: selectedCategory === cat ? '600' : '400',
+                                    background: selectedCategory === cat ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                                    color: selectedCategory === cat ? 'var(--bg-card)' : 'var(--text-secondary)',
+                                    border: selectedCategory === cat ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                {cat === 'all' ? '전체 보기' : (cat ? getCategoryDisplayName(cat) : '')}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* 관리 모드 토글 및 삭제 버튼 - 우측 상단 배치 */}
+                    <div style={{ position: 'absolute', top: '0', right: '0', display: 'flex', gap: '8px' }}>
                         {isEditMode && selectedToDelete.length > 0 && (
                             <button
                                 onClick={handleDeleteProducts}
-                                className="btn-primary"
+                                className="badge badge-primary"
                                 style={{
-                                    background: '#ef4444',
-                                    padding: '8px 16px',
-                                    fontSize: '14px'
+                                    border: 'none', cursor: 'pointer', padding: '8px 16px', fontSize: '12px',
+                                    background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: '4px'
                                 }}
                             >
+                                <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
                                 삭제 ({selectedToDelete.length})
                             </button>
                         )}
+
                         <button
-                            onClick={() => setIsEditMode(!isEditMode)}
-                            className="glass-card"
-                            style={{
-                                padding: '8px 16px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                color: isEditMode ? '#a78bfa' : 'var(--text-secondary)',
-                                borderColor: isEditMode ? '#a78bfa' : 'transparent'
+                            onClick={() => {
+                                setIsEditMode(!isEditMode);
+                                setSelectedToDelete([]);
                             }}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '8px',
+                                cursor: 'pointer',
+                                color: isEditMode ? 'var(--primary-color)' : 'var(--text-secondary)',
+                                transition: 'all 0.2s'
+                            }}
+                            title={isEditMode ? '편집 종료' : '편집 모드'}
                         >
-                            {isEditMode ? '완료' : '관리'}
+                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                {isEditMode ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                )}
+                            </svg>
                         </button>
                     </div>
                 </div>
 
                 {/* 제품 그리드 */}
-                {loading ? (
-                    <div className="product-grid">
-                        {[1, 2, 3, 4, 5, 6].map(i => (
-                            <ProductSkeleton key={i} />
-                        ))}
-                    </div>
-                ) : products.length > 0 ? (
-                    <div className="product-grid">
-                        {products.map(product => (
-                            <div key={product.id} style={{ position: 'relative' }}>
-                                <ProductCard
-                                    product={product}
-                                    onVideoPlay={(p) => {
-                                        if (isEditMode) {
-                                            toggleSelectProduct(p.id);
-                                        } else {
-                                            handleVideoPlay(p);
-                                        }
-                                    }}
-                                />
-                                {isEditMode && (
-                                    <div
-                                        onClick={() => toggleSelectProduct(product.id)}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '12px',
-                                            left: '12px',
-                                            zIndex: 20,
-                                            width: '24px',
-                                            height: '24px',
-                                            borderRadius: '6px',
-                                            background: selectedToDelete.includes(product.id) ? '#8b5cf6' : 'rgba(0,0,0,0.5)',
-                                            border: '2px solid white',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            transition: 'all 0.2s'
-                                        }}
-                                    >
-                                        {selectedToDelete.includes(product.id) && (
-                                            <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    /* 빈 상태 */
-                    <div style={{ textAlign: 'center', padding: '80px 0' }}>
-                        <div style={{
-                            width: '96px',
-                            height: '96px',
-                            margin: '0 auto 24px',
-                            borderRadius: '50%',
-                            background: 'rgba(139, 92, 246, 0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
-                            <svg style={{ width: '48px', height: '48px', color: '#a78bfa' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
+                {
+                    loading ? (
+                        <div className="product-grid">
+                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                <ProductSkeleton key={i} />
+                            ))}
                         </div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '8px' }}>아직 등록된 제품이 없습니다</h3>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                            관리자 페이지에서 첫 번째 제품을 등록해보세요.
-                        </p>
-                        <a href="/admin" className="btn-primary">
-                            제품 등록하기
-                        </a>
-                    </div>
-                )}
-            </div>
+                    ) : products.length > 0 ? (
+                        <div className="product-grid">
+                            {products.map(product => (
+                                <div key={product.id} style={{ position: 'relative' }}>
+                                    <ProductCard
+                                        product={product}
+                                        onVideoPlay={(p) => {
+                                            if (isEditMode) {
+                                                toggleSelectProduct(p.id);
+                                            } else {
+                                                handleVideoPlay(p);
+                                            }
+                                        }}
+                                    />
+                                    {isEditMode && (
+                                        <div
+                                            onClick={() => toggleSelectProduct(product.id)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '12px',
+                                                left: '12px',
+                                                zIndex: 20,
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '6px',
+                                                background: selectedToDelete.includes(product.id) ? '#8b5cf6' : 'rgba(0,0,0,0.5)',
+                                                border: '2px solid white',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {selectedToDelete.includes(product.id) && (
+                                                <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        /* 빈 상태 */
+                        <div style={{ textAlign: 'center', padding: '80px 0' }}>
+                            <div style={{
+                                width: '96px',
+                                height: '96px',
+                                margin: '0 auto 24px',
+                                borderRadius: '50%',
+                                background: 'rgba(139, 92, 246, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <svg style={{ width: '48px', height: '48px', color: '#a78bfa' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                            </div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '8px' }}>아직 등록된 제품이 없습니다</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                                관리자 페이지에서 첫 번째 제품을 등록해보세요.
+                            </p>
+                            <a href="/admin" className="btn-primary">
+                                제품 등록하기
+                            </a>
+                        </div>
+                    )
+                }
+            </div >
 
             {/* 비디오 모달 */}
-            <VideoModal
+            < VideoModal
                 product={selectedProduct}
-                onClose={() => setSelectedProduct(null)}
+                onClose={() => setSelectedProduct(null)
+                }
             />
-        </div>
+        </div >
     );
 }

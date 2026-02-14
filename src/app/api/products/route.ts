@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
                 fabric: body.fabric,
                 gender,
                 category: body.category, // Pass category for prompt generation
+                narrationText: body.narrationText, // Pass custom narration
             }).then(() => {
                 console.log(`[Product] AI 영상+음성 생성 완료`);
             }).catch(err => {

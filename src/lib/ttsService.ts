@@ -12,49 +12,30 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 const ELEVENLABS_API_BASE = 'https://api.elevenlabs.io/v1';
 const ELEVENLABS_MODEL = 'eleven_multilingual_v2'; // 한국어 포함 29개 언어 지원
 
-// 음성 ID (성별에 따라 다른 음성 사용)
-// ElevenLabs 기본 제공 음성 (premade voices)
-const VOICE_OPTIONS: Record<string, { id: string; name: string }> = {
-    female: { id: 'AW5wrnG1jVizOYY7R1Oo', name: 'JiYoung' },    // 친근하고 맑은 톤 (교육/쇼핑몰 추천)
-    male: { id: 'Ir7oQcBXWiq4oFGROCfj', name: 'Taemin' },      // 따뜻하고 자연스러운 톤 (내레이션)
-    neutral: { id: 'uyVNoMrnUku1dZyVEXwD', name: 'Anna Kim' }, // 부드럽고 차분한 목소리
+// 음성 ID 풀 (성별에 따라 랜덤 선택)
+// 유료 플랜 전용 Library Voices
+const VOICE_POOLS: Record<string, string[]> = {
+    female: [
+        'ksaI0TCD9BstzEzlxj4q',
+        'uyVNoMrnUku1dZyVEXwD'
+    ],
+    male: [
+        'YBRudLRm83BV5Mazcr42',
+        'CxErO97xpQgQXYmapDKX'
+    ],
 };
 
 // ============================================================================
-// 상품 설명 나레이션 텍스트 생성
-// ============================================================================
+import { getNarrationOptions } from './narrationUtils';
 
+export { getNarrationOptions };
+
+// 랜덤 선택 (기존 호환성 유지)
 export function generateNarrationText(
     productInfo: { name: string; fabric: string; gender: Gender; category?: string }
 ): string {
-    const genderText = productInfo.gender === 'female' ? '여성' : '남성';
-    const categoryText = productInfo.category === 'short-sleeve' ? '반팔 티셔츠' :
-        productInfo.category === 'long-sleeve' ? '긴팔 티셔츠' :
-            productInfo.category === 'sleeveless' ? '민소매' :
-                productInfo.category === 'shirt' ? '셔츠' :
-                    productInfo.category === 'knit' ? '니트' :
-                        productInfo.category === 'hoodie' ? '후드' :
-                            productInfo.category === 'pants' ? '팬츠' :
-                                productInfo.category === 'shorts' ? '쇼츠' :
-                                    productInfo.category === 'skirt' ? '스커트' :
-                                        productInfo.category === 'denim' ? '데님' :
-                                            productInfo.category === 'slacks' ? '슬랙스' :
-                                                productInfo.category === 'jacket' ? '자켓' :
-                                                    productInfo.category === 'coat' ? '코트' :
-                                                        productInfo.category === 'padding' ? '패딩' :
-                                                            productInfo.category === 'cardigan' ? '가디건' :
-                                                                productInfo.category === 'onepiece' ? '원피스' :
-                                                                    '아이템';
-
-    // 짧고 세련된 5초 분량의 나레이션 (약 40~60자)
-    const narrations = [
-        `${productInfo.name}. ${productInfo.fabric} 소재의 프리미엄 ${genderText} ${categoryText}입니다.`,
-        `${productInfo.fabric} 소재로 완성한 ${productInfo.name}. 세련된 ${genderText} ${categoryText} 룩을 만나보세요.`,
-        `프리미엄 ${productInfo.fabric} 소재, ${productInfo.name}. ${genderText}을 위한 특별한 ${categoryText}.`,
-    ];
-
-    // 랜덤 선택
-    return narrations[Math.floor(Math.random() * narrations.length)];
+    const options = getNarrationOptions(productInfo);
+    return options[Math.floor(Math.random() * options.length)];
 }
 
 // ============================================================================
@@ -72,15 +53,17 @@ export async function generateTTS(
     text: string,
     gender: Gender = 'female'
 ): Promise<TTSResult> {
-    const voice = VOICE_OPTIONS[gender] || VOICE_OPTIONS.female;
+    // 성별에 맞는 풀에서 랜덤 선택 (기본값: female)
+    const pool = VOICE_POOLS[gender] || VOICE_POOLS.female;
+    const voiceId = pool[Math.floor(Math.random() * pool.length)];
 
     console.log(`[ElevenLabs TTS] ===== TTS 음성 생성 시작 =====`);
     console.log(`[ElevenLabs TTS] 텍스트: ${text}`);
-    console.log(`[ElevenLabs TTS] 음성: ${voice.name} (${voice.id})`);
+    console.log(`[ElevenLabs TTS] 음성 ID: ${voiceId}`);
     console.log(`[ElevenLabs TTS] 모델: ${ELEVENLABS_MODEL}`);
 
     try {
-        const url = `${ELEVENLABS_API_BASE}/text-to-speech/${voice.id}?output_format=mp3_44100_128`;
+        const url = `${ELEVENLABS_API_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
 
         const requestBody = {
             text: text,
@@ -136,9 +119,10 @@ export async function generateTTS(
 // ============================================================================
 
 export async function generateProductNarration(
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string },
+    customScript?: string
 ): Promise<TTSResult> {
-    const narrationText = generateNarrationText(productInfo);
+    const narrationText = customScript || generateNarrationText(productInfo);
     console.log(`[ElevenLabs TTS] 상품 나레이션 생성: "${narrationText}"`);
     return await generateTTS(narrationText, productInfo.gender);
 }
