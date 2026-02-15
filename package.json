@@ -12,6 +12,7 @@
     "node": ">=18.17.0"
   },
   "dependencies": {
+    "@formspree/react": "^3.0.0",
     "@supabase/supabase-js": "^2.95.3",
     "jsonwebtoken": "^9.0.3",
     "next": "16.1.6",

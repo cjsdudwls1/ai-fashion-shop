@@ -17,11 +17,14 @@ export function Navigation() {
                 </Link>
 
                 <div className="flex items-center gap-8">
-                    <Link href="/products" className="nav-link text-sm uppercase tracking-wider">
-                        SHOP
+                    <Link href="/products" className="nav-link text-sm font-medium tracking-wide">
+                        쇼핑하기
                     </Link>
-                    <Link href="/admin" className="nav-link text-sm uppercase tracking-wider">
-                        ADMIN
+                    <Link href="/partnership" className="nav-link text-sm font-medium tracking-wide">
+                        제휴 문의
+                    </Link>
+                    <Link href="/admin" className="nav-link text-sm font-medium tracking-wide">
+                        관리자
                     </Link>
                     <ThemeToggle />
                 </div>
