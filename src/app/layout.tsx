@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
 
+import { Toaster } from 'react-hot-toast';
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -21,10 +23,11 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
+        <Toaster position="top-center" />
         <Navigation />
 
         {/* 메인 컨텐츠 */}
-        <main className="pt-24 min-h-screen">
+        <main className="min-h-screen">
           {children}
         </main>
 

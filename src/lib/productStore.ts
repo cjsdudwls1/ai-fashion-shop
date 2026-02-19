@@ -6,14 +6,15 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 class ProductStore {
-    // 상품 추가
-    async addProduct(product: Product): Promise<void> {
-        const { error } = await supabase
+    // 상품 추가 (서버 사이드에서 Admin Client 사용 가능하도록 변경)
+    async addProduct(product: Product, client: any = supabase): Promise<void> {
+        const { error } = await client
             .from('products')
             .insert({
                 id: product.id,
                 name: product.name,
                 image_url: product.imageUrl,
+                gallery_images: product.galleryImages, // Save gallery
                 fabric: product.fabric,
                 gender: product.gender,
                 category: product.category, // New field for Supabase
@@ -22,6 +23,7 @@ class ProductStore {
                 video_url: product.videoUrl,
                 audio_url: product.audioUrl,
                 video_status: product.videoStatus,
+                price: product.price, // Added price field
                 created_at: product.createdAt
             });
 
@@ -50,7 +52,8 @@ class ProductStore {
 
         const { data, error } = await supabase
             .from('products')
-            .select('*')
+            // 목록 조회 시 갤러리 이미지 등 대용량 데이터 제외
+            .select('id, name, image_url, fabric, gender, category, colors, sizes, video_url, video_status, price, created_at, deleted_at, video_error_reason')
             .is('deleted_at', null) // 삭제되지 않은 항목만
             .order('created_at', { ascending: false });
 
@@ -65,7 +68,7 @@ class ProductStore {
     async getTrashProducts(): Promise<Product[]> {
         const { data, error } = await supabase
             .from('products')
-            .select('*')
+            .select('id, name, image_url, fabric, gender, category, colors, sizes, video_url, video_status, price, created_at, deleted_at, video_error_reason')
             .not('deleted_at', 'is', null) // 삭제된 항목만
             .order('deleted_at', { ascending: false });
 
@@ -93,8 +96,8 @@ class ProductStore {
     }
 
     // 상품 삭제 (휴지통으로 이동 - Soft Delete)
-    async deleteProduct(id: string): Promise<boolean> {
-        const { error } = await supabase
+    async deleteProduct(id: string, client: any = supabase): Promise<boolean> {
+        const { error } = await client
             .from('products')
             .update({ deleted_at: new Date().toISOString() })
             .eq('id', id);
@@ -102,8 +105,8 @@ class ProductStore {
     }
 
     // 상품 복구 (Restore)
-    async restoreProduct(id: string): Promise<boolean> {
-        const { error } = await supabase
+    async restoreProduct(id: string, client: any = supabase): Promise<boolean> {
+        const { error } = await client
             .from('products')
             .update({ deleted_at: null })
             .eq('id', id);
@@ -111,8 +114,8 @@ class ProductStore {
     }
 
     // 영구 삭제 (Permanent Delete)
-    async permanentDeleteProduct(id: string): Promise<boolean> {
-        const { error } = await supabase
+    async permanentDeleteProduct(id: string, client: any = supabase): Promise<boolean> {
+        const { error } = await client
             .from('products')
             .delete()
             .eq('id', id);
@@ -131,13 +134,13 @@ class ProductStore {
     }
 
     // 영상 상태 업데이트
-    async updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string, audioUrl?: string, errorReason?: string): Promise<boolean> {
+    async updateVideoStatus(id: string, status: Product['videoStatus'], videoUrl?: string, audioUrl?: string, errorReason?: string, client: any = supabase): Promise<boolean> {
         const updates: any = { video_status: status };
         if (videoUrl) updates.video_url = videoUrl;
         if (audioUrl) updates.audio_url = audioUrl;
         if (errorReason) updates.video_error_reason = errorReason;
 
-        const { error } = await supabase
+        const { error } = await client
             .from('products')
             .update(updates)
             .eq('id', id);
@@ -151,6 +154,7 @@ class ProductStore {
             id: data.id,
             name: data.name,
             imageUrl: data.image_url,
+            galleryImages: data.gallery_images || [], // Map gallery
             fabric: data.fabric,
             gender: data.gender,
             category: data.category || 'short-sleeve', // Map from Supabase (nullable)
@@ -160,6 +164,7 @@ class ProductStore {
             audioUrl: data.audio_url,
             videoStatus: data.video_status,
             videoErrorReason: data.video_error_reason, // Map from Supabase
+            price: data.price, // Map price
             createdAt: new Date(data.created_at),
             deletedAt: data.deleted_at ? new Date(data.deleted_at) : null
         };

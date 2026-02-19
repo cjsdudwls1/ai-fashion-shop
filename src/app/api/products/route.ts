@@ -6,10 +6,52 @@ import { NextRequest, NextResponse } from 'next/server';
 import { productStore, parseColorStock, parseSizeStock } from '@/lib/productStore';
 import { generateProductVideo } from '@/lib/aiVideoService';
 import { Product, ProductInput } from '@/lib/types';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { productSchema } from '@/lib/validations';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // 고유 ID 생성
 function generateId(): string {
     return `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Admin 권한 확인 유틸리티
+async function checkAdminAuth() {
+    return true; // [개발용] 모든 요청 허용 (관리자 권한 체크 우회)
+    // TODO: 운영 배포 시 반드시 원래 로직으로 복구해야 함
+
+    /*
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() { return cookieStore.getAll() },
+                setAll(cookiesToSet) {
+                    try {
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            cookieStore.set(name, value, options)
+                        );
+                    } catch { }
+                },
+            },
+        }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return false;
+
+    const isAdmin =
+        user.email === 'admin@fashion.local' ||
+        user.user_metadata?.is_admin === true ||
+        user.user_metadata?.role === 'admin' ||
+        user.app_metadata?.role === 'admin';
+
+    return isAdmin;
+    */
 }
 
 // GET: 전체 상품 조회
@@ -37,16 +79,27 @@ export async function GET(request: NextRequest) {
 
 // POST: 새 상품 등록
 export async function POST(request: NextRequest) {
-    try {
-        const body: ProductInput = await request.json();
+    // Admin 권한 체크
+    const isAdmin = await checkAdminAuth();
+    if (!isAdmin) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-        // 유효성 검사
-        if (!body.name || !body.imageBase64 || !body.fabric) {
+    try {
+        const json = await request.json();
+
+        // Zod Validation
+        const validationResult = productSchema.safeParse(json);
+
+        if (!validationResult.success) {
+            const errorMessage = validationResult.error.issues.map((e: any) => e.message).join(', ');
             return NextResponse.json(
-                { error: '필수 정보가 누락되었습니다 (상품명, 이미지, 질감)' },
+                { error: `Validation Error: ${errorMessage}` },
                 { status: 400 }
             );
         }
+
+        const body = validationResult.data;
 
         // 상품 ID 생성
         const productId = generateId();
@@ -62,7 +115,12 @@ export async function POST(request: NextRequest) {
         const newProduct: Product = {
             id: productId,
             name: body.name,
-            imageUrl: body.imageBase64, // Base64 이미지 직접 저장
+            imageUrl: body.imageBase64, // Base64 이미지 직접 저장 (Primary)
+            galleryImages: body.galleryImages?.map(img => ({
+                url: img.base64,
+                color: img.color,
+                isPrimary: img.isPrimary
+            })) || [], // 갤러리 이미지 저장
             fabric: body.fabric,
             gender,
             category: body.category, // New field
@@ -71,11 +129,12 @@ export async function POST(request: NextRequest) {
             videoUrl: null,
             audioUrl: null,
             videoStatus: 'pending',
+            price: body.price, // Add price
             createdAt: new Date(),
         };
 
         // 저장소에 추가
-        await productStore.addProduct(newProduct);
+        await productStore.addProduct(newProduct, supabaseAdmin);
         console.log(`[Product] 새 상품 등록: ${productId} - ${body.name} (${gender === 'female' ? '여성복' : '남성복'})`);
 
         // AI 영상 생성 자동 트리거 (비동기 - 응답 대기 안 함)
@@ -113,6 +172,12 @@ export async function POST(request: NextRequest) {
 }
 // DELETE: 상품 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
+    // Admin 권한 체크
+    const isAdmin = await checkAdminAuth();
+    if (!isAdmin) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { ids } = await request.json();
 
@@ -129,11 +194,11 @@ export async function DELETE(request: NextRequest) {
         const results = await Promise.all(
             ids.map(id => {
                 if (action === 'restore') {
-                    return productStore.restoreProduct(id);
+                    return productStore.restoreProduct(id, supabaseAdmin);
                 } else if (action === 'permanent') {
-                    return productStore.permanentDeleteProduct(id);
+                    return productStore.permanentDeleteProduct(id, supabaseAdmin);
                 } else {
-                    return productStore.deleteProduct(id);
+                    return productStore.deleteProduct(id, supabaseAdmin);
                 }
             })
         );

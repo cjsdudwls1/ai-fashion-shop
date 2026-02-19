@@ -2,6 +2,7 @@
 // 워크플로우: 1) Virtual Try-On → 2) Image-to-Video (kling-v2-6, 무음) → 3) ElevenLabs TTS 나레이션 생성
 
 import { productStore } from './productStore';
+import { supabaseAdmin } from './supabaseAdmin';
 import type { Gender } from './types';
 import { generateProductNarration, audioToDataUrl } from './ttsService';
 import jwt from 'jsonwebtoken';
@@ -302,7 +303,7 @@ export async function generateProductVideo(
     console.log(`${'='.repeat(60)}\n`);
 
     try {
-        await productStore.updateVideoStatus(productId, 'generating');
+        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, supabaseAdmin);
 
         // ===== 남녀공용(Unisex) 확률 로직 =====
         let targetGender: 'female' | 'male' = 'female'; // Default
@@ -358,7 +359,7 @@ export async function generateProductVideo(
 
         // ===== 결과 저장 =====
         if (videoResult.success && videoResult.videoUrl) {
-            await productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl);
+            await productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl, undefined, supabaseAdmin);
             console.log(`\n${'='.repeat(60)}`);
             console.log(`[AI Service] 영상+음성 생성 완료!`);
             console.log(`[AI Service] 비디오 URL: ${videoResult.videoUrl.substring(0, 80)}...`);
@@ -369,7 +370,7 @@ export async function generateProductVideo(
             const errorMsg = videoResult.error || '알 수 없는 오류';
             // audioDataUrl은 실패해도 저장하지 않고, 실패 원인만 저장하도록 변경하거나, 오디오도 저장하고 싶다면 인자를 맞춰서 전달
             // updateVideoStatus(id, status, videoUrl, audioUrl, errorReason)
-            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl, errorMsg);
+            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl, errorMsg, supabaseAdmin);
 
             const detailedMsg = `영상 생성 실패: ${errorMsg}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
             console.error(`\n[AI Service] ${detailedMsg}\n`);
@@ -380,7 +381,7 @@ export async function generateProductVideo(
         const product = await productStore.getProduct(productId);
         if (product && product.videoStatus === 'generating') {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg);
+            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, supabaseAdmin);
         }
         console.error(`[AI Service] 오류:`, error);
         throw error; // 호출부에서 성공/실패 판단 가능

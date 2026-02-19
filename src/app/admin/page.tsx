@@ -2,7 +2,17 @@
 
 import { useState, useRef, ChangeEvent, FormEvent, DragEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { toast } from 'react-hot-toast';
 import { getNarrationOptions } from '@/lib/narrationUtils';
+import imageCompression from 'browser-image-compression';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase Client (For Storage Upload)
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // 사전 정의된 색상 목록
 const COMMON_COLORS = [
@@ -40,6 +50,7 @@ export default function AdminPage() {
     const [formData, setFormData] = useState({
         name: '',
         fabric: '',
+        price: '', // price input as string to handle empty state conveniently
         gender: 'female' as 'female' | 'male' | 'unisex',
         category: '', // Default category
     });
@@ -48,10 +59,17 @@ export default function AdminPage() {
     const [stockList, setStockList] = useState<StockItem[]>([]);
     const [selectedColor, setSelectedColor] = useState<string | null>(null);
     const [selectedSize, setSelectedSize] = useState<string | null>(null);
-    const [quantity, setQuantity] = useState<number>(1);
+    const [quantity, setQuantity] = useState<number | string>(1);
 
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [imageBase64, setImageBase64] = useState<string>('');
+    interface UploadedImage {
+        id: string;
+        file: File | null; // null if already uploaded/url based (though here we process files)
+        preview: string;
+        url?: string; // Add URL field for storage url
+        isMain: boolean;
+        color?: string;
+    }
+    const [images, setImages] = useState<UploadedImage[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -102,21 +120,77 @@ export default function AdminPage() {
         // alert('스크립트가 적용되었습니다.'); // 너무 자주 뜨면 귀찮으므로 주석
     };
 
-    // 이미지 파일 처리
-    const handleImageFile = (file: File) => {
-        if (!file.type.startsWith('image/')) {
-            setError('Image files only.');
-            return;
+    // 이미지 압축 및 처리
+    const handleImageFiles = async (files: FileList | null) => {
+        if (!files) return;
+
+        const newImages: UploadedImage[] = [];
+
+        const options = {
+            maxSizeMB: 1, // 최대 1MB
+            maxWidthOrHeight: 1920, // FHD 해상도 제한
+            useWebWorker: true,
+            fileType: 'image/webp' // WebP로 변환
+        };
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (!file.type.startsWith('image/')) continue;
+
+            try {
+                // 1. 압축
+                const compressedFile = await imageCompression(file, options);
+
+                // 2. 미리보기 생성
+                const previewUrl = await imageCompression.getDataUrlFromFile(compressedFile);
+
+                newImages.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    file: compressedFile, // 압축된 파일 저장
+                    preview: previewUrl,
+                    isMain: false,
+                    color: ''
+                });
+            } catch (err) {
+                console.error('Image compression error:', err);
+                toast.error(`${file.name} 처리 중 오류가 발생했습니다.`);
+            }
         }
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64 = reader.result as string;
-            setImagePreview(base64);
-            setImageBase64(base64);
-            setError(null);
-        };
-        reader.readAsDataURL(file);
+        setImages(prev => {
+            const combined = [...prev, ...newImages];
+            // 대표 이미지가 없으면 첫 번째 이미지를 대표로 설정
+            if (combined.length > 0 && !combined.some(img => img.isMain)) {
+                combined[0].isMain = true;
+            }
+            return combined;
+        });
+        setError(null);
+    };
+
+    const handleRemoveImage = (id: string) => {
+        setImages(prev => {
+            const filtered = prev.filter(img => img.id !== id);
+            // 대표 이미지를 삭제했다면 첫 번째 이미지를 대표로 설정
+            if (filtered.length > 0 && !filtered.some(img => img.isMain)) {
+                filtered[0].isMain = true;
+            }
+            return filtered;
+        });
+    };
+
+    const handleSetMainImage = (id: string) => {
+        setImages(prev => prev.map(img => ({
+            ...img,
+            isMain: img.id === id
+        })));
+    };
+
+    const handleSetImageColor = (id: string, color: string) => {
+        setImages(prev => prev.map(img => ({
+            ...img,
+            color: img.id === id ? color : img.color
+        })));
     };
 
     // 나레이션 옵션 자동 생성
@@ -143,7 +217,7 @@ export default function AdminPage() {
             // 그 외의 경우 (처음 진입, 데이터 변경으로 옵션 내용이 바뀐 경우) 첫 번째 옵션 선택
             setSelectedNarration(options[0]);
         }
-    }, [formData.name, formData.fabric, formData.gender, formData.category, isCustomNarration]); // selectedNarration 의존성 제거 (무한 루프 방지)
+    }, [formData.name, formData.fabric, formData.price, formData.gender, formData.category, isCustomNarration]); // selectedNarration 의존성 제거 (무한 루프 방지)
 
     const handleNarrationChange = (value: string) => {
         if (value === 'custom') {
@@ -155,8 +229,7 @@ export default function AdminPage() {
     };
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleImageFile(file);
+        handleImageFiles(e.target.files);
     };
 
     const handleDragOver = (e: DragEvent) => {
@@ -172,8 +245,7 @@ export default function AdminPage() {
     const handleDrop = (e: DragEvent) => {
         e.preventDefault();
         setIsDragOver(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleImageFile(file);
+        handleImageFiles(e.dataTransfer.files);
     };
 
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -182,10 +254,16 @@ export default function AdminPage() {
     };
 
     // 재고 추가 핸들러
+    // 재고 추가 핸들러
     const handleAddStock = () => {
         if (!selectedColor) return;
         if (!selectedSize) return;
-        if (quantity < 1) return;
+
+        const qty = Number(quantity);
+        if (isNaN(qty) || qty < 1) {
+            toast.error('유효한 수량을 입력해주세요.');
+            return;
+        }
 
         const existingIndex = stockList.findIndex(
             item => item.color === selectedColor && item.size === selectedSize
@@ -193,7 +271,7 @@ export default function AdminPage() {
 
         if (existingIndex >= 0) {
             const newList = [...stockList];
-            newList[existingIndex].quantity += quantity;
+            newList[existingIndex].quantity += qty;
             setStockList(newList);
         } else {
             setStockList([
@@ -202,7 +280,7 @@ export default function AdminPage() {
                     id: Date.now(),
                     color: selectedColor,
                     size: selectedSize,
-                    quantity: quantity
+                    quantity: qty
                 }
             ]);
         }
@@ -213,18 +291,61 @@ export default function AdminPage() {
         setStockList(stockList.filter(item => item.id !== id));
     };
 
+    // Storage 업로드 함수
+    const uploadImageToStorage = async (file: File): Promise<string> => {
+        const fileExt = 'webp'; // We convert to webp
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${fileName}`; // bucket root
+
+        const { error: uploadError } = await supabase.storage
+            .from('products')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        const { data } = supabase.storage
+            .from('products')
+            .getPublicUrl(filePath);
+
+        return data.publicUrl;
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError(null);
 
-        if (!formData.name.trim()) return setError('상품명을 입력해주세요.');
-        if (!imageBase64) return setError('상품 이미지를 업로드해주세요.');
-        if (!formData.fabric.trim()) return setError('소재 정보를 입력해주세요.');
-        if (stockList.length === 0) return setError('최소 하나 이상의 재고를 추가해주세요.');
+        // Validation
+        if (!formData.name.trim()) { toast.error('상품명을 입력해주세요.'); return setError('상품명을 입력해주세요.'); }
+        if (images.length === 0) { toast.error('최소 한 장 이상의 이미지를 업로드해주세요.'); return setError('최소 한 장 이상의 이미지를 업로드해주세요.'); }
+
+        const mainImage = images.find(img => img.isMain) || images[0];
+        if (!mainImage) { toast.error('대표 이미지를 설정해주세요.'); return setError('대표 이미지를 설정해주세요.'); }
+
+        if (!formData.fabric.trim()) { toast.error('소재 정보를 입력해주세요.'); return setError('소재 정보를 입력해주세요.'); }
+        if (!formData.price || parseInt(formData.price) < 0) { toast.error('유효한 가격을 입력해주세요.'); return setError('유효한 가격을 입력해주세요.'); }
+        if (stockList.length === 0) { toast.error('최소 하나 이상의 재고를 추가해주세요.'); return setError('최소 하나 이상의 재고를 추가해주세요.'); }
 
         setIsSubmitting(true);
 
         try {
+            // 1. 이미지 업로드 (병렬 처리)
+            const uploadPromises = images.map(async (img) => {
+                if (img.file) {
+                    const publicUrl = await uploadImageToStorage(img.file);
+                    return { ...img, url: publicUrl };
+                }
+                return img; // 이미 URL이 있는 경우 (수정 시 등 - 현재는 신규만 고려)
+            });
+
+            // 모든 이미지 업로드 대기
+            const uploadedImages = await Promise.all(uploadPromises);
+
+            // 업로드 완료 후 URL이 포함된 상태로 메인 이미지 찾기
+            const mainUplodedImage = uploadedImages.find(img => img.id === mainImage.id) || uploadedImages[0];
+
+            // 2. 데이터 준비
             const colorMap = new Map<string, number>();
             stockList.forEach(item => {
                 colorMap.set(item.color, (colorMap.get(item.color) || 0) + item.quantity);
@@ -241,12 +362,24 @@ export default function AdminPage() {
                 .map(([size, qty]) => `${size}:${qty}`)
                 .join('\n');
 
+            // 갤러리 이미지 구성 (URL 사용)
+            const galleryImages = uploadedImages.map(img => ({
+                url: img.url || '', // Use Storage URL
+                base64: '', // No longer sending base64
+                color: img.color || undefined,
+                isPrimary: img.isMain
+            }));
+
+            // 3. API 요청
             const response = await fetch('/api/products', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: formData.name,
-                    imageBase64,
+                    price: parseInt(formData.price),
+                    imageUrl: mainUplodedImage.url, // Send URL instead of Base64
+                    imageBase64: '', // Deprecated
+                    galleryImages, // Gallery Images with URLs
                     fabric: formData.fabric,
                     gender: formData.gender,
                     category: formData.category,
@@ -262,9 +395,13 @@ export default function AdminPage() {
                 throw new Error(data.error || 'Failed to register product.');
             }
 
+            toast.success('상품이 성공적으로 등록되었습니다.');
             router.push('/products');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred.');
+            console.error(err);
+            const message = err instanceof Error ? err.message : 'An error occurred during upload.';
+            setError(message);
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -283,39 +420,7 @@ export default function AdminPage() {
                         상품 등록
                     </h1>
                     <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-                            type="button"
-                            onClick={() => router.back()}
-                            className="btn-secondary"
-                            style={{
-                                padding: '10px 16px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-card)',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontWeight: 500,
-                                cursor: 'pointer'
-                            }}
-                        >
-                            취소
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="btn-primary"
-                            style={{
-                                padding: '10px 24px',
-                                fontSize: '14px',
-                                borderRadius: '8px',
-                                minWidth: '100px',
-                                background: '#1a1a1a',
-                                color: '#fff',
-                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                            }}
-                        >
-                            {isSubmitting ? '저장 중...' : '상품 저장'}
-                        </button>
+                        {/* Buttons removed from here */}
                     </div>
                 </div>
 
@@ -339,7 +444,12 @@ export default function AdminPage() {
 
                         {/* Card 2: Media */}
                         <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>상품 이미지 (Media)</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>상품 이미지 (Media)</label>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{images.length}장 업로드됨 (첫 번째 이미지가 대표 이미지)</span>
+                            </div>
+
+                            {/* Upload Zone */}
                             <div
                                 className={`upload-zone ${isDragOver ? 'drag-over' : ''}`}
                                 onClick={() => fileInputRef.current?.click()}
@@ -347,48 +457,92 @@ export default function AdminPage() {
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
                                 style={{
-                                    height: '240px',
-                                    background: imagePreview ? 'var(--bg-elevated)' : 'var(--bg-elevated)',
+                                    height: images.length > 0 ? '120px' : '240px',
+                                    background: 'var(--bg-elevated)',
                                     border: '1px dashed var(--border-color)',
                                     borderRadius: '12px',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     transition: 'all 0.2s ease',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    marginBottom: '24px'
                                 }}
                             >
-                                {imagePreview ? (
-                                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                        <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '16px' }} />
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); setImagePreview(null); setImageBase64(''); }}
-                                            style={{
-                                                position: 'absolute', top: '12px', right: '12px',
-                                                padding: '8px 12px', background: 'rgba(0,0,0,0.7)', color: '#fff',
-                                                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
-                                                backdropFilter: 'blur(4px)'
-                                            }}
-                                        >
-                                            삭제
-                                        </button>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{
+                                        marginBottom: '12px', width: '40px', height: '40px', margin: '0 auto 12px',
+                                        borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-secondary)' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                                     </div>
-                                ) : (
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{
-                                            marginBottom: '12px', width: '40px', height: '40px', margin: '0 auto 12px',
-                                            borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                        }}>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-secondary)' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
-                                        </div>
-
-
-                                        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>이미지 업로드</p>
-                                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>JPEG, PNG, WEBP 파일 지원</p>
-                                    </div>
-                                )}
+                                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                        {images.length > 0 ? '이미지 추가하기' : '이미지 업로드'}
+                                    </p>
+                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>드래그 앤 드롭 또는 클릭하여 선택 (다중 선택 가능)</p>
+                                </div>
                             </div>
-                            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                            <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+
+                            {/* Image Grid */}
+                            {images.length > 0 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+                                    {images.map((img, idx) => (
+                                        <div key={img.id} style={{
+                                            position: 'relative',
+                                            borderRadius: '8px',
+                                            overflow: 'hidden',
+                                            border: img.isMain ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                            background: 'var(--bg-elevated)'
+                                        }}>
+                                            {/* Preview */}
+                                            <div style={{ position: 'relative', aspectRatio: '3/4', width: '100%' }}>
+                                                <img src={img.preview} alt={`Upload ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                {/* Delete Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }}
+                                                    style={{
+                                                        position: 'absolute', top: '8px', right: '8px',
+                                                        width: '24px', height: '24px', borderRadius: '50%',
+                                                        background: 'rgba(0,0,0,0.6)', color: '#fff',
+                                                        border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                                </button>
+                                                {/* Main Badge */}
+                                                {img.isMain && (
+                                                    <div style={{
+                                                        position: 'absolute', top: '8px', left: '8px',
+                                                        padding: '4px 8px', borderRadius: '4px',
+                                                        background: 'var(--primary-color)', color: '#fff',
+                                                        fontSize: '10px', fontWeight: 700
+                                                    }}>
+                                                        대표
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div style={{ padding: '12px' }}>
+                                                {/* Set Main */}
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name="mainImage"
+                                                        checked={img.isMain}
+                                                        onChange={() => handleSetMainImage(img.id)}
+                                                        style={{ accentColor: 'var(--primary-color)' }}
+                                                    />
+                                                    <span style={{ fontSize: '12px', fontWeight: 500 }}>대표 이미지 설정</span>
+                                                </label>
+
+                                                {/* Set Color Select Removed */}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Card 1: Basic Info */}
@@ -405,6 +559,28 @@ export default function AdminPage() {
                                     }}
                                 />
                             </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>가격 (Price)</label>
+                                <input
+                                    type="text"
+                                    name="price"
+                                    value={formData.price ? Number(formData.price.toString().replace(/,/g, '')).toLocaleString() : ''}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/,/g, '');
+                                        if (!isNaN(Number(value))) {
+                                            setFormData(prev => ({ ...prev, price: value }));
+                                        }
+                                    }}
+                                    placeholder="예: 59,000"
+                                    className="input-field"
+                                    style={{
+                                        border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px',
+                                        background: 'var(--bg-elevated)', width: '100%'
+                                    }}
+                                />
+                            </div>
+
                             <div>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>소재 (Material / Fabric)</label>
                                 <input
@@ -676,7 +852,11 @@ export default function AdminPage() {
                                             <label style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>수량 (Quantity)</label>
                                             <input
                                                 type="number" min="1" value={quantity}
-                                                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === '') setQuantity('');
+                                                    else setQuantity(parseInt(val));
+                                                }}
                                                 style={{
                                                     width: '100%', padding: '10px', border: '1px solid var(--border-color)',
                                                     borderRadius: '8px', background: 'var(--bg-card)', fontSize: '14px'
@@ -750,6 +930,43 @@ export default function AdminPage() {
 
 
 
+                    </div>
+
+                    {/* Bottom Action Buttons */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px' }}>
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="btn-secondary"
+                            style={{
+                                padding: '10px 16px',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-card)',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            취소
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            className="btn-primary"
+                            style={{
+                                padding: '10px 24px',
+                                fontSize: '14px',
+                                borderRadius: '8px',
+                                minWidth: '100px',
+                                background: '#1a1a1a',
+                                color: '#fff',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            {isSubmitting ? '저장 중...' : '상품 저장'}
+                        </button>
                     </div>
                 </div>
             </div>
