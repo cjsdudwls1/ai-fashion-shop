@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 // Admin Client (Service Role) - DANGEROUS: Bypass RLS
 // Use only in secure server-side contexts (API Routes, Server Actions)
 
