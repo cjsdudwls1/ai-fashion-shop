@@ -17,68 +17,74 @@
   --color-accent: #111827;
 }
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  /* 라이트 모드 팔레트 (Balanced Minimalist) */
-  --bg-dark: #f9fafb;
-  /* Soft light grey background */
-  --bg-card: #ffffff;
-  /* Pure white cards */
-  --bg-elevated: #f3f4f6;
-  /* Very light grey for zones */
-  --text-primary: #111827;
-  /* Soft Black */
-  --text-secondary: #4b5563;
-  /* Medium Grey */
-  --text-muted: #9ca3af;
-  /* Light Grey */
+  /* 라이트 모드 팔레트 (Refined & Modern) */
+  --bg-dark: #ffffff;
+  /* Pure white background for cleanliness */
+  --bg-card: #f8fafc;
+  /* Slate-50 for subtle contrast */
+  --bg-elevated: #f1f5f9;
+  /* Slate-100 */
+  --text-primary: #0f172a;
+  /* Slate-900 (Deep Navy/Black) */
+  --text-secondary: #475569;
+  /* Slate-600 */
+  --text-muted: #94a3b8;
+  /* Slate-400 */
 
-  /* 그라데이션 제거 - 단색 위주 with depth */
-  --gradient-primary: #111827;
-  --gradient-gold: #111827;
+  /* 브랜드 컬러: Indigo (신뢰감, 고급스러움) */
+  --primary-color: #4f46e5;
+  /* Indigo-600 */
+  --primary-hover: #4338ca;
+  /* Indigo-700 */
+  --primary-light: #e0e7ff;
+  /* Indigo-100 */
 
-  /* 글래스모피즘 대신 얇은 선 사용 - 더 명확한 보더 */
-  --glass-bg: rgba(255, 255, 255, 0.95);
-  --glass-border: #e5e7eb;
-  /* Cool grey border (Gray-200) */
-
-  /* 추가 색상 */
-  --border-color: #e5e7eb;
-  --shadow-color: rgba(0, 0, 0, 0.05);
+  /* UI 요소 */
+  --border-color: #e2e8f0;
+  /* Slate-200 */
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: #e2e8f0;
+  --shadow-color: rgba(15, 23, 42, 0.08);
 
   /* Font Weights */
   --font-light: 300;
   --font-normal: 400;
   --font-medium: 500;
   --font-bold: 600;
+  --font-extra-bold: 800;
 }
 
-/* 다크 모드 (Refined Dark - Better Contrast with Slate) */
+/* 다크 모드 (Premium Dark - Deep Navy/Slate) */
 [data-theme="dark"] {
-  --bg-dark: #0f172a;
-  /* Deep Slate Blue/Black (Slate-950) instead of pure black */
-  --bg-card: #1e293b;
-  /* Slate grey cards (Slate-800) */
-  --bg-elevated: #334155;
-  /* Lighter slate (Slate-700) */
+  --bg-dark: #020617;
+  /* Slate-950 (Very deep navy) */
+  --bg-card: #0f172a;
+  /* Slate-900 */
+  --bg-elevated: #1e293b;
+  /* Slate-800 */
   --text-primary: #f8fafc;
-  /* Off-white (Slate-50) */
-  --text-secondary: #cbd5e1;
-  /* Light slate text (Slate-300) */
-  --text-muted: #94a3b8;
-  /* Muted slate (Slate-400) */
+  /* Slate-50 */
+  --text-secondary: #94a3b8;
+  /* Slate-400 */
+  --text-muted: #64748b;
+  /* Slate-500 */
 
-  /* 다크 모드용 미니멀 라인 */
-  --glass-bg: rgba(15, 23, 42, 0.9);
+  /* 브랜드 컬러 (Dark Mode - Slightly Lighter) */
+  --primary-color: #6366f1;
+  /* Indigo-500 */
+  --primary-hover: #818cf8;
+  /* Indigo-400 */
+  --primary-light: rgba(99, 102, 241, 0.15);
+
+  --border-color: #1e293b;
+  /* Slate-800 */
+  --glass-bg: rgba(15, 23, 42, 0.85);
   --glass-border: #334155;
-  /* Visible border */
-
-  /* 추가 색상 */
-  --border-color: #334155;
-  --shadow-color: rgba(0, 0, 0, 0.5);
-
-  --color-primary: #f8fafc;
-  /* In dark mode, primary action is White/Off-white */
-  --gradient-primary: #f8fafc;
+  /* Slate-700 */
+  --shadow-color: rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -131,6 +137,18 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Hide scrollbar utility */
+.hide-scroll {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.hide-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes pulse {
@@ -200,10 +218,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-primary);
+  background: var(--text-primary);
   color: var(--bg-dark);
   /* Contrast text */
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--text-primary);
   padding: 12px 24px;
   border-radius: 8px;
   /* Standard rounded corners */
@@ -250,11 +268,17 @@ body {
 
 /* 텍스트 스타일 */
 .text-hero {
-  font-size: 3rem;
+  font-size: 2.25rem;
+  /* P3: 소형 기기 기반값 (3rem → 2.25rem) */
   font-weight: 300;
-  /* Thin font */
   line-height: 1.1;
   letter-spacing: -0.02em;
+}
+
+@media (min-width: 640px) {
+  .text-hero {
+    font-size: 3rem;
+  }
 }
 
 @media (min-width: 768px) {
@@ -413,7 +437,14 @@ body {
 }
 
 .section-padding {
-  padding: 100px 24px;
+  padding: 60px 16px;
+  /* P3: 모바일 상하 60px으로 축소 */
+}
+
+@media (min-width: 768px) {
+  .section-padding {
+    padding: 100px 24px;
+  }
 }
 
 /* Grid Layouts - Spacing Adjustment */
@@ -421,12 +452,13 @@ body {
 .product-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 40px;
+  gap: 16px;
 }
 
 @media (min-width: 640px) {
   .product-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
   }
 }
 
@@ -435,6 +467,7 @@ body {
   .grid-cards,
   .product-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
   }
 }
 
@@ -475,4 +508,399 @@ input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 1000px var(--bg-card) inset !important;
   -webkit-text-fill-color: var(--text-primary) !important;
   transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ================================================
+   CHECKOUT DESIGN SYSTEM (memo.md #11)
+   Typography: 12 / 14 / 16 / 20 / 24
+   Radius: 8px (통일)
+   Shadow: 3단계
+   Spacing: 4px grid
+   ================================================ */
+
+:root {
+  /* Design System Tokens */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadow 3단계 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+
+  /* Checkout Colors */
+  --checkout-success: #16a34a;
+  --checkout-error: #dc2626;
+  --checkout-gray-50: #f9fafb;
+  --checkout-gray-100: #f3f4f6;
+  --checkout-gray-200: #e5e7eb;
+  --checkout-gray-500: #6b7280;
+}
+
+[data-theme="dark"] {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.2);
+
+  --checkout-gray-50: #1e293b;
+  --checkout-gray-100: #1e293b;
+  --checkout-gray-200: #334155;
+  --checkout-gray-500: #94a3b8;
+}
+
+/* ================================================
+   CHECKOUT PAGE LAYOUT (#1)
+   ================================================ */
+.checkout-container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (min-width: 768px) {
+  .checkout-container {
+    padding: 0 32px;
+  }
+}
+
+.checkout-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+@media (min-width: 1024px) {
+  .checkout-grid {
+    flex-direction: row;
+    gap: 40px;
+  }
+}
+
+.checkout-left {
+  flex: 7;
+  min-width: 0;
+}
+
+.checkout-right {
+  flex: 3;
+  min-width: 320px;
+  max-width: 400px;
+}
+
+@media (max-width: 1023px) {
+  .checkout-right {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ================================================
+   CHECKOUT FORM INPUTS (#5)
+   ================================================ */
+.checkout-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkout-input::placeholder {
+  color: var(--text-muted);
+}
+
+.checkout-input:focus {
+  border-width: 2px;
+  border-color: var(--primary-color);
+  padding: 0 15px;
+  /* border 2px 보정 */
+}
+
+.checkout-input.input-error {
+  border-color: var(--checkout-error);
+  border-width: 2px;
+  padding: 0 15px;
+}
+
+.checkout-input-error-msg {
+  font-size: 12px;
+  color: var(--checkout-error);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.checkout-select {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
+}
+
+.checkout-select:focus {
+  border-width: 2px;
+  border-color: var(--primary-color);
+  padding-left: 15px;
+}
+
+/* ================================================
+   CHECKOUT SECTION CARD
+   ================================================ */
+.checkout-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.checkout-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ================================================
+   ORDER SUMMARY CARD (#8)
+   ================================================ */
+.order-summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-lg);
+  position: sticky;
+  top: 80px;
+}
+
+.order-summary-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.order-summary-total-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.order-summary-total-price {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+/* ================================================
+   CHECKOUT CTA BUTTON (#4)
+   ================================================ */
+.checkout-cta-btn {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.15s ease;
+  outline: none;
+  box-shadow: var(--shadow-md);
+}
+
+.checkout-cta-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.checkout-cta-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.checkout-cta-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* ================================================
+   DEPOSIT INFO BOX (#6)
+   ================================================ */
+.deposit-info-box {
+  background: var(--checkout-gray-100);
+  border: 1px solid var(--checkout-gray-200);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.deposit-info-box .account-number {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.deposit-info-box .account-holder {
+  font-size: 13px;
+  color: var(--checkout-gray-500);
+  margin-top: 2px;
+}
+
+.deposit-info-box .trust-msg {
+  font-size: 12px;
+  color: var(--checkout-gray-500);
+  margin-top: 12px;
+}
+
+.deposit-info-box .trust-msg strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ================================================
+   PRODUCT THUMBNAIL (#7)
+   ================================================ */
+.checkout-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+}
+
+.checkout-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ================================================
+   CHECKOUT NAVIGATION (#9) - 집중 모드
+   ================================================ */
+.checkout-nav .nav-hide {
+  display: none !important;
+}
+
+/* ================================================
+   MOBILE CHECKOUT (#10)
+   ================================================ */
+@media (max-width: 1023px) {
+  .checkout-mobile-sticky-btn {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+
+  .checkout-mobile-sticky-btn .checkout-cta-btn {
+    height: 52px;
+    font-size: 16px;
+  }
+}
+
+/* Checkout/Cart page bottom padding for mobile sticky button */
+@media (max-width: 1023px) {
+
+  .checkout-page-wrapper,
+  .cart-page-wrapper {
+    padding-bottom: 100px !important;
+  }
+}
+
+/* ================================================
+   MOBILE OPTIMIZATION (P2/P3)
+   ================================================ */
+
+/* P2: 카테고리 필터 가로 스크롤 래퍼 */
+.category-filter-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+/* 우측 페이드 마스크 — 스크롤 가능함을 시각적으로 표시 */
+.category-filter-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 48px;
+  background: linear-gradient(to left, var(--bg-dark) 20%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.category-filter-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  /* 스크롤바 숨김 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* iOS 관성 스크롤 */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  /* 오른쪽 페이드 영역 확보 */
+  padding-right: 48px;
+}
+
+.category-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* P2: 터치 타겟 전역 최솟값 보조
+   badge 버튼들(색상 선택 등)의 최소 탭 영역 확보 */
+.badge {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* P2: 비밀번호 '보기' 버튼 터치 영역 확보 */
+.password-toggle-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* P3: 모바일 font 변수 연결 */
+body {
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }

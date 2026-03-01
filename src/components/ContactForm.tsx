@@ -18,57 +18,43 @@ export function ContactForm() {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
-            <div>
-                <label htmlFor="contact" className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
-                    전화번호 또는 이메일 주소
-                </label>
-                <input
-                    id="contact"
-                    type="text"
-                    name="contact"
-                    className="input-field w-full"
-                    placeholder="010-0000-0000 또는 your@email.com"
-                    required
-                />
-                <ValidationError
-                    prefix="Contact"
-                    field="contact"
-                    errors={state.errors}
-                    className="text-red-500 text-sm mt-1"
-                />
-            </div>
+        <form onSubmit={handleSubmit} className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
 
             <div>
-                <label htmlFor="message" className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
-                    문의 내용
+                <label htmlFor="message" className="block text-sm font-medium" style={{ marginBottom: '8px', display: 'block' }}>
+                    문의 내용 <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                     id="message"
                     name="message"
                     rows={5}
                     className="input-field w-full resize-none"
-                    placeholder="비지니스 제휴 및 도매 후 직판 관련 문의 내용을 적어주세요..."
+                    placeholder="문의 내용을 적어주세요..."
                     required
                 />
                 <ValidationError
                     prefix="Message"
                     field="message"
                     errors={state.errors}
-                    className="text-red-500 text-sm mt-1"
+                    className="text-red-500 text-sm"
+                    style={{ marginTop: '4px', display: 'block' }}
                 />
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    <span style={{ color: '#ef4444' }}>*</span> 표시는 필수 입력 항목입니다.
+                </p>
             </div>
 
             <button
                 type="submit"
                 disabled={state.submitting}
-                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary w-full"
+                style={{ marginTop: '32px', opacity: state.submitting ? 0.5 : 1, cursor: state.submitting ? 'not-allowed' : 'pointer' }}
             >
                 {state.submitting ? '전송 중...' : '문의하기'}
             </button>
 
             {state.errors && (
-                <div className="text-red-500 text-sm text-center mt-2">
+                <div style={{ color: '#ef4444', fontSize: '14px', textAlign: 'center', marginTop: '8px' }}>
                     메시지 전송 중 오류가 발생했습니다. 다시 시도해 주세요.
                 </div>
             )}

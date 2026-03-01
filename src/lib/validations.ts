@@ -7,13 +7,15 @@ export const productSchema = z.object({
     price: z.number()
         .min(0, "가격은 0원 이상이어야 합니다.")
         .default(0),
-    imageBase64: z.string().min(1, "상품 이미지를 업로드해주세요."),
+    imageUrl: z.string().min(1, "상품 이미지를 업로드해주세요.").optional(),
+    imageBase64: z.string().optional(),
     galleryImages: z.array(z.object({
-        base64: z.string(),
+        url: z.string().optional(),
+        base64: z.string().optional(),
         color: z.string().optional(),
         isPrimary: z.boolean().optional(),
     })).optional(),
-    fabric: z.string().min(2, "소재 정보를 입력해주세요."),
+    fabric: z.string().min(1, "소재 정보를 입력해주세요."),
     gender: z.enum(['female', 'male', 'unisex']),
     category: z.string().optional(),
     narrationText: z.string().optional(),
@@ -24,6 +26,8 @@ export const productSchema = z.object({
     // For now, sticking to current API structure:
     colorsText: z.string().optional(),
     sizesText: z.string().optional(),
+    mediaGenerationType: z.enum(['video', 'image', 'none']).optional(),
+    videoModel: z.string().optional(),
 });
 
 export type ProductSchema = z.infer<typeof productSchema>;

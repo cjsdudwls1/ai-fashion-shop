@@ -1,0 +1,216 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - navigation [ref=e3]:
+      - link "AI FASHION" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img [ref=e6]
+        - generic [ref=e8]: AI FASHION
+      - generic [ref=e9]:
+        - link "쇼핑하기" [ref=e10] [cursor=pointer]:
+          - /url: /products
+        - link "문의" [ref=e11] [cursor=pointer]:
+          - /url: /partnership
+        - link "관리자" [ref=e12] [cursor=pointer]:
+          - /url: /admin
+        - link [ref=e14] [cursor=pointer]:
+          - /url: /cart
+          - img [ref=e15]
+        - link "주문 조회" [ref=e18] [cursor=pointer]:
+          - /url: /order-lookup
+        - link "로그인" [ref=e19] [cursor=pointer]:
+          - /url: /login
+        - button "다크 모드로 변경" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - complementary [ref=e25]:
+        - generic [ref=e26]:
+          - heading "관리자 메뉴" [level=2] [ref=e28]
+          - navigation [ref=e29]:
+            - link "대시보드" [ref=e30] [cursor=pointer]:
+              - /url: /admin/dashboard
+              - img [ref=e31]
+              - generic [ref=e33]: 대시보드
+            - link "상품 등록" [ref=e34] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e36]
+              - generic [ref=e38]: 상품 등록
+            - link "재고 관리" [ref=e39] [cursor=pointer]:
+              - /url: /admin/inventory
+              - img [ref=e40]
+              - generic [ref=e42]: 재고 관리
+            - link "주문 관리" [ref=e43] [cursor=pointer]:
+              - /url: /admin/orders
+              - img [ref=e44]
+              - generic [ref=e46]: 주문 관리
+      - generic [ref=e50]:
+        - heading "상품 등록" [level=1] [ref=e52]:
+          - button [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+          - text: 상품 등록
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - generic [ref=e60]: 상품 이미지 (Media)
+                - generic [ref=e61]: 0장 업로드됨 (첫 번째 이미지가 대표 이미지)
+              - generic [ref=e63] [cursor=pointer]:
+                - img [ref=e65]
+                - paragraph [ref=e67]: 이미지 업로드
+                - paragraph [ref=e68]: 드래그 앤 드롭 또는 클릭하여 선택 (다중 선택 가능)
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - generic [ref=e71]: 상품명 (Title)
+                - 'textbox "예: 미니멀 울 코트" [ref=e72]'
+              - generic [ref=e73]:
+                - generic [ref=e74]: 가격 (Price)
+                - 'textbox "예: 59,000" [ref=e75]'
+              - generic [ref=e76]:
+                - generic [ref=e77]: 소재 (Material / Fabric)
+                - 'textbox "예: 캐시미어 100%" [ref=e78]'
+              - generic [ref=e79]:
+                - generic [ref=e80]: 성별 (Gender)
+                - generic [ref=e81]:
+                  - generic [ref=e82] [cursor=pointer]:
+                    - radio "여성 (Female)" [checked] [ref=e83]
+                    - text: 여성 (Female)
+                  - generic [ref=e84] [cursor=pointer]:
+                    - radio "남성 (Male)" [ref=e85]
+                    - text: 남성 (Male)
+                  - generic [ref=e86] [cursor=pointer]:
+                    - radio "남녀공용 (Unisex)" [ref=e87]
+                    - text: 남녀공용 (Unisex)
+              - generic [ref=e88]:
+                - generic [ref=e89]: 카테고리 (Category)
+                - combobox [ref=e90] [cursor=pointer]:
+                  - option "카테고리를 선택해주세요 (Select Category)" [disabled] [selected]
+                  - option "반팔 (Short Sleeve)"
+                  - option "긴팔 (Long Sleeve)"
+                  - option "민소매 (Sleeveless)"
+                  - option "셔츠/블라우스 (Shirt)"
+                  - option "니트/스웨터 (Knit)"
+                  - option "후드/맨투맨 (Hoodie)"
+                  - option "긴바지 (Pants)"
+                  - option "반바지 (Shorts)"
+                  - option "스커트 (Skirt)"
+                  - option "데님/청바지 (Denim)"
+                  - option "슬랙스 (Slacks)"
+                  - option "재킷/점퍼 (Jacket)"
+                  - option "코트 (Coat)"
+                  - option "패딩 (Padding)"
+                  - option "가디건 (Cardigan)"
+                  - option "원피스 (Dress)"
+                  - option "세트/투피스 (Set)"
+                  - option "속옷/언더웨어 (Underwear)"
+                  - option "기타/액세서리 (Etc)"
+            - generic [ref=e91]:
+              - heading "미디어 생성 옵션 (Media Generation)" [level=3] [ref=e92]
+              - generic [ref=e93]:
+                - generic [ref=e96] [cursor=pointer]:
+                  - generic [ref=e97]: 🎬 AI 동영상 생성
+                  - text: 상품 이미지를 기반으로 AI 가상 피팅 + 패션 동영상 + 나레이션을 자동 생성합니다.
+                - generic [ref=e100] [cursor=pointer]:
+                  - generic [ref=e101]: 🖼️ AI 이미지 생성
+                  - text: AI 가상 피팅(Try-On) 이미지만 생성합니다. 동영상은 생성하지 않습니다.
+                - generic [ref=e104] [cursor=pointer]:
+                  - generic [ref=e105]: ⏭️ 미디어 생성 안 함
+                  - text: AI 미디어를 생성하지 않고 상품만 등록합니다.
+            - generic [ref=e106]:
+              - heading "AI 영상 생성 모델 (Video Model)" [level=3] [ref=e107]
+              - paragraph [ref=e108]: 영상을 생성할 AI 모델을 선택하세요.
+              - generic [ref=e109]:
+                - generic [ref=e112] [cursor=pointer]:
+                  - generic [ref=e113]: 빠른 생성 모델 (Fast)
+                  - text: 720p 해상도로 빠르게 영상을 생성합니다. (Veo 3.1 Fast)
+                - generic [ref=e116] [cursor=pointer]:
+                  - generic [ref=e117]: 고품질 모델 (High Quality)
+                  - text: 더욱 뛰어난 품질의 영상을 생성합니다. 생성 시간이 다소 길 수 있습니다. (Veo 3.1 최신 모델)
+            - generic [ref=e118]:
+              - heading "모델 대사 (Narration)" [level=3] [ref=e119]
+              - paragraph [ref=e120]: AI 영상에서 모델이 읊을 대사를 선택하세요. 상품 정보에 맞춰 추천됩니다.
+              - generic [ref=e121]:
+                - generic [ref=e124] [cursor=pointer]:
+                  - generic [ref=e125]: 프리미엄 감성
+                  - generic [ref=e126]: "\"상품명. 프리미엄 소재 소재로 완성한 프리미엄 패션 아이템, 지금 만나보세요.\""
+                - generic [ref=e129] [cursor=pointer]:
+                  - generic [ref=e130]: 트렌디 캐주얼
+                  - generic [ref=e131]: "\"이번 시즌 가장 핫한 상품명! 프리미엄 소재의 편안한 착용감을 경험해보세요.\""
+                - generic [ref=e134] [cursor=pointer]:
+                  - generic [ref=e135]: 실용성 강조
+                  - generic [ref=e136]: "\"프리미엄 소재 소재의 상품명, 스타일과 실용성을 동시에 갖춘 패션 아이템입니다.\""
+                - generic [ref=e139] [cursor=pointer]:
+                  - generic [ref=e140]: 직접 입력
+                  - text: 원하는 대사를 직접 작성합니다
+            - generic [ref=e141]:
+              - generic [ref=e142]:
+                - heading "재고 (Stock)" [level=3] [ref=e143]
+                - generic [ref=e144]: 0개 옵션 추가됨
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - generic [ref=e148]: "옵션 1: 색상 (Color)"
+                  - generic [ref=e149]:
+                    - button "블랙" [ref=e150] [cursor=pointer]:
+                      - generic [ref=e152]: 블랙
+                    - button "화이트" [ref=e153] [cursor=pointer]:
+                      - generic [ref=e155]: 화이트
+                    - button "네이비" [ref=e156] [cursor=pointer]:
+                      - generic [ref=e158]: 네이비
+                    - button "차콜" [ref=e159] [cursor=pointer]:
+                      - generic [ref=e161]: 차콜
+                    - button "그레이" [ref=e162] [cursor=pointer]:
+                      - generic [ref=e164]: 그레이
+                    - button "베이지" [ref=e165] [cursor=pointer]:
+                      - generic [ref=e167]: 베이지
+                    - button "아이보리" [ref=e168] [cursor=pointer]:
+                      - generic [ref=e170]: 아이보리
+                    - button "브라운" [ref=e171] [cursor=pointer]:
+                      - generic [ref=e173]: 브라운
+                    - button "레드" [ref=e174] [cursor=pointer]:
+                      - generic [ref=e176]: 레드
+                    - button "블루" [ref=e177] [cursor=pointer]:
+                      - generic [ref=e179]: 블루
+                    - button "그린" [ref=e180] [cursor=pointer]:
+                      - generic [ref=e182]: 그린
+                    - button "옐로우" [ref=e183] [cursor=pointer]:
+                      - generic [ref=e185]: 옐로우
+                    - button "핑크" [ref=e186] [cursor=pointer]:
+                      - generic [ref=e188]: 핑크
+                    - button "퍼플" [ref=e189] [cursor=pointer]:
+                      - generic [ref=e191]: 퍼플
+                - generic [ref=e192]:
+                  - generic [ref=e193]: "옵션 2: 사이즈 (Size)"
+                  - generic [ref=e194]:
+                    - button "XS" [ref=e195] [cursor=pointer]
+                    - button "S" [ref=e196] [cursor=pointer]
+                    - button "M" [ref=e197] [cursor=pointer]
+                    - button "L" [ref=e198] [cursor=pointer]
+                    - button "XL" [ref=e199] [cursor=pointer]
+                    - button "2XL" [ref=e200] [cursor=pointer]
+                    - button "3XL" [ref=e201] [cursor=pointer]
+                    - button "FREE" [ref=e202] [cursor=pointer]
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - generic [ref=e205]: 수량 (Quantity)
+                    - spinbutton [ref=e206]: "1"
+                  - button "옵션 추가" [disabled] [ref=e207]
+              - table [ref=e209]:
+                - rowgroup [ref=e210]:
+                  - row "옵션명 재고 수량 관리" [ref=e211]:
+                    - columnheader "옵션명" [ref=e212]
+                    - columnheader "재고 수량" [ref=e213]
+                    - columnheader "관리" [ref=e214]
+                - rowgroup [ref=e215]:
+                  - row "추가된 옵션이 없습니다." [ref=e216]:
+                    - cell "추가된 옵션이 없습니다." [ref=e217]
+          - generic [ref=e218]:
+            - button "취소" [ref=e219] [cursor=pointer]
+            - button "상품 저장" [ref=e220] [cursor=pointer]
+  - contentinfo [ref=e221]:
+    - paragraph [ref=e222]: MVP Demo - AI 아바타 영상 자동 생성 쇼핑몰
+  - button "Open Next.js Dev Tools" [ref=e228] [cursor=pointer]:
+    - img [ref=e229]
+  - alert [ref=e232]
+```

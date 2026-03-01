@@ -4,16 +4,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Product } from '@/lib/types';
-// import { useCartStore } from '@/store/cartStore'; // Removed unused import
 import { VideoModal } from '@/components/VideoModal';
 import { toast } from 'react-hot-toast';
 import { ProductCardSkeleton } from '@/components/ProductSkeleton';
 import { useRouter } from 'next/navigation';
-
+import { CATEGORY_MAP } from '@/lib/constants';
+import { supabase } from '@/lib/supabase';
 // 제품 카드 컴포넌트
 function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: (product: Product) => void }) {
     const router = useRouter();
-    // const addItem = useCartStore((state: any) => state.addItem); // Removed unused hook
     const totalColorStock = product.colors.reduce((sum: number, c: any) => sum + c.quantity, 0);
     const totalSizeStock = product.sizes.reduce((sum: number, s: any) => sum + s.quantity, 0);
 
@@ -26,10 +25,10 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
     };
 
     return (
-        <div
+        <Link
+            href={`/products/${product.id}`}
             className="glass-card group"
-            onClick={() => router.push(`/products/${product.id}`)}
-            style={{ overflow: 'hidden', cursor: 'pointer' }}
+            style={{ overflow: 'hidden', cursor: 'pointer', display: 'block', position: 'relative' }}
         >
             {/* 제품 이미지 */}
             <div style={{ position: 'relative', aspectRatio: '1/1', overflow: 'hidden' }}>
@@ -51,43 +50,19 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                     </div>
                 )}
 
-                {/* 영상 재생 오버레이 */}
+                {/* 영상 오버레이 (생성중/실패 상태 등) */}
                 <div style={{
                     position: 'absolute',
                     inset: 0,
                     background: 'rgba(0,0,0,0.4)',
-                    opacity: 0,
+                    opacity: (product.videoStatus === 'generating' || product.videoStatus === 'failed') ? 1 : 0,
                     transition: 'opacity 0.3s',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    pointerEvents: 'none' // 클릭 이벤트가 아래로 전달되도록 설정
                 }} className="card-overlay">
-                    {product.videoStatus === 'completed' && product.videoUrl ? (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onVideoPlay(product);
-                            }}
-                            style={{
-                                width: '64px',
-                                height: '64px',
-                                borderRadius: '50%',
-                                background: 'rgba(255,255,255,0.3)',
-                                backdropFilter: 'blur(12px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                border: '1px solid rgba(255,255,255,0.5)',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            className="hover:scale-110 hover:bg-white/40"
-                        >
-                            <svg style={{ width: '32px', height: '32px', color: 'white', marginLeft: '4px' }} fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
-                        </button>
-                    ) : product.videoStatus === 'generating' ? (
+                    {product.videoStatus === 'generating' ? (
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -143,12 +118,17 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                     {product.videoStatus === 'generating' && (
                         <span className="badge badge-warning animate-pulse" style={{ fontSize: '11px', flexShrink: 0 }}>AI 피팅모델 생성중</span>
                     )}
-                    {product.videoStatus === 'completed' && (
+                    {product.videoStatus === 'completed' && product.videoUrl && (
                         <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}>
                             <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7z" />
                             </svg>
-                            {product.audioUrl ? '영상+나레이션' : '영상 있음'}
+                            영상 있음
+                        </span>
+                    )}
+                    {product.videoStatus === 'completed' && !product.videoUrl && product.tryOnImageUrl && (
+                        <span className="badge badge-info" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}>
+                            피팅 이미지
                         </span>
                     )}
                     {product.videoStatus === 'pending' && (
@@ -186,6 +166,7 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                                 <button
                                     key={idx}
                                     onClick={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         setSelectedColor(color.color);
                                     }}
@@ -211,6 +192,7 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
                                 <button
                                     key={idx}
                                     onClick={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         setSelectedSize(size.size);
                                     }}
@@ -228,10 +210,6 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
 
 
 
-            {/* 장바구니 담기 버튼 (삭제됨 - 상세 페이지에서 구매 유도) */}
-            {/* <div style={{ padding: '0 20px 20px 20px' }}>
-                <button ... />
-            </div> */}
 
             <style jsx>{`
         .glass-card:hover .card-overlay {
@@ -241,7 +219,7 @@ function ProductCard({ product, onVideoPlay }: { product: Product; onVideoPlay: 
           transform: scale(1.1);
         }
       `}</style>
-        </div >
+        </Link >
     );
 }
 
@@ -258,6 +236,23 @@ export default function ProductsPage() {
 
     const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 카테고리 필터
     const [viewMode, setViewMode] = useState<'gallery' | 'trash'>('gallery'); // 보기 모드
+    const [isAdmin, setIsAdmin] = useState(false); // 관리자 여부
+
+    // 관리자 권한 확인
+    useEffect(() => {
+        const checkAdmin = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                setIsAdmin(data?.role === 'admin');
+            }
+        };
+        checkAdmin();
+    }, []);
 
     // 제품 목록 가져오기
     const fetchProducts = useCallback(async () => {
@@ -284,54 +279,41 @@ export default function ProductsPage() {
     // 존재하는 모든 카테고리 목록 추출 (중복 제거)
     const availableCategories = ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
 
-    // 카테고리 이름 매핑 (한글 표시용)
-    const categoryNameMap: Record<string, string> = {
-        'all': '전체 (All)',
-        '반팔 (Short Sleeve)': '반팔',
-        '긴팔 (Long Sleeve)': '긴팔',
-        '반바지 (Shorts)': '반바지',
-        '긴바지 (Trousers)': '긴바지',
-        '치마 (Skirt)': '치마',
-        '원피스 (Dress)': '원피스',
-        '아우터 (Outer)': '아우터',
-        '신발 (Shoes)': '신발',
-        // 새로운 카테고리 매핑 추가 (코드 -> 표시명)
-        'track-top': '트랙탑/져지',
-        'short-sleeve': '반팔',
-        'long-sleeve': '긴팔',
-        'sleeveless': '민소매',
-        'shirt': '셔츠/블라우스',
-        'knit': '니트/스웨터',
-        'hoodie': '후드/맨투맨',
-        'pants': '긴바지',
-        'shorts': '반바지',
-        'skirt': '치마',
-        'denim': '데님/청바지',
-        'slacks': '슬랙스',
-        'jacket': '재킷/점퍼',
-        'coat': '코트',
-        'padding': '패딩',
-        'cardigan': '가디건',
-        'onepiece': '원피스',
-        'set': '세트/투피스',
-        'underwear': '속옷/언더웨어',
-        'etc': '기타',
-        // 기존 레거시 데이터 호환용 (혹시 모를 텍스트 저장 값)
-    };
+    const getCategoryDisplayName = (cat: string) => CATEGORY_MAP[cat] || cat;
 
-    const getCategoryDisplayName = (cat: string) => {
-        return categoryNameMap[cat] || cat;
-    };
 
-    // 초기 로드 및 주기적 폴링 (영상 상태 업데이트 확인)
+    // generating/pending 상태의 상품이 있는지 확인
+    const hasGeneratingProducts = products.some(
+        p => p.videoStatus === 'generating' || p.videoStatus === 'pending'
+    );
+
+    // 초기 로드
     useEffect(() => {
         fetchProducts();
-
-        // 5초마다 제품 목록 갱신 (영상 생성 상태 확인)
-        const interval = setInterval(fetchProducts, 5000);
-
-        return () => clearInterval(interval);
     }, [fetchProducts]);
+
+    // generating/pending 상태 상품이 있을 때만 5초 폴링 + sync 트리거
+    useEffect(() => {
+        if (!hasGeneratingProducts) return;
+
+        // sync API 호출 (영상 완료 확인 트리거 - 관리자 페이지가 닫혀 있어도 동작)
+        const triggerSync = () => {
+            fetch('/api/admin/videos/sync', { method: 'GET' }).catch(() => { });
+        };
+
+        // 즉시 한 번 sync 호출
+        triggerSync();
+
+        // 15초마다 sync 호출 (영상 완료 확인)
+        const syncTimer = setInterval(triggerSync, 15000);
+        // 5초마다 상품 목록 갱신 (UI 반영)
+        const pollTimer = setInterval(fetchProducts, 5000);
+
+        return () => {
+            clearInterval(syncTimer);
+            clearInterval(pollTimer);
+        };
+    }, [hasGeneratingProducts, fetchProducts]);
 
     // 비디오 재생
     const handleVideoPlay = (product: Product) => {
@@ -423,140 +405,161 @@ export default function ProductsPage() {
     return (
         <div className="section-padding">
             <div className="container-main">
-                {/* 헤더 */}
-                <div style={{ textAlign: 'center', marginBottom: '48px', position: 'relative' }}>
-                    <h1 className="text-hero" style={{ marginBottom: '12px' }}>
-                        <span className="text-gradient">
-                            {viewMode === 'trash' ? '휴지통' : '제품 갤러리'}
-                        </span>
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-                        {viewMode === 'trash'
-                            ? '삭제된 상품은 1일 후 영구 삭제됩니다.'
-                            : 'AI가 소개하는 프리미엄 패션 아이템'}
-                    </p>
+                {/* 헤더 — 모바일 대응 flex 레이아웃 */}
+                <div style={{ marginBottom: '48px' }}>
 
-                    {/* 보기 모드 전환 (휴지통 <-> 갤러리) */}
-                    <div style={{ position: 'absolute', top: 0, left: 0 }}>
-                        <button
-                            onClick={() => {
-                                setViewMode(viewMode === 'gallery' ? 'trash' : 'gallery');
-                                setSelectedCategory('all');
-                                setIsEditMode(false);
-                                setSelectedToDelete([]);
-                            }}
-                            className="glass-card"
-                            style={{
-                                padding: '8px 12px',
-                                fontSize: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                cursor: 'pointer',
-                                color: viewMode === 'trash' ? '#ef4444' : 'var(--text-secondary)'
-                            }}
-                        >
-                            {viewMode === 'gallery' ? (
-                                <>
-                                    <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    휴지통 보기
-                                </>
-                            ) : (
-                                <>
-                                    <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                    </svg>
-                                    갤러리 보기
-                                </>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* 카테고리 필터 바 */}
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                        {availableCategories.map((cat) => (
+                    {/* 모바일: 상단 컨트롤 버튼 행 (휴지통/편집) - 관리자에게만 보임 */}
+                    {isAdmin && (
+                        <div className="products-header-controls" style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '16px'
+                        }}>
+                            {/* 좌측: 휴지통/갤러리 전환 */}
                             <button
-                                key={cat}
-                                onClick={() => setSelectedCategory(cat || 'all')}
+                                onClick={() => {
+                                    setViewMode(viewMode === 'gallery' ? 'trash' : 'gallery');
+                                    setSelectedCategory('all');
+                                    setIsEditMode(false);
+                                    setSelectedToDelete([]);
+                                }}
+                                className="glass-card"
                                 style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '14px',
-                                    fontWeight: selectedCategory === cat ? '600' : '400',
-                                    background: selectedCategory === cat ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                                    color: selectedCategory === cat ? 'var(--bg-card)' : 'var(--text-secondary)',
-                                    border: selectedCategory === cat ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
                                     cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
+                                    color: viewMode === 'trash' ? '#ef4444' : 'var(--text-secondary)',
+                                    minHeight: '36px',
                                 }}
                             >
-                                {cat === 'all' ? '전체 보기' : (cat ? getCategoryDisplayName(cat) : '')}
+                                {viewMode === 'gallery' ? (
+                                    <>
+                                        <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        휴지통 보기
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                        </svg>
+                                        갤러리 보기
+                                    </>
+                                )}
                             </button>
-                        ))}
+
+                            {/* 우측: 편집/삭제/복구 버튼 */}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {viewMode === 'trash' && selectedToDelete.length > 0 && (
+                                    <button
+                                        onClick={handleRestoreProducts}
+                                        className="badge badge-success"
+                                        style={{
+                                            border: 'none', cursor: 'pointer', padding: '8px 12px', fontSize: '12px',
+                                            display: 'flex', alignItems: 'center', gap: '4px', minHeight: '36px',
+                                        }}
+                                    >
+                                        <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        복구 ({selectedToDelete.length})
+                                    </button>
+                                )}
+
+                                {(isEditMode || viewMode === 'trash') && selectedToDelete.length > 0 && (
+                                    <button
+                                        onClick={handleDeleteProducts}
+                                        className="badge badge-primary"
+                                        style={{
+                                            border: 'none', cursor: 'pointer', padding: '8px 12px', fontSize: '12px',
+                                            background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: '4px', minHeight: '36px',
+                                        }}
+                                    >
+                                        <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        {viewMode === 'trash' ? `영구 삭제 (${selectedToDelete.length})` : `삭제 (${selectedToDelete.length})`}
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => {
+                                        setIsEditMode(!isEditMode);
+                                        setSelectedToDelete([]);
+                                    }}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '8px',
+                                        padding: '8px',
+                                        cursor: 'pointer',
+                                        color: (isEditMode || viewMode === 'trash') ? 'var(--primary-color)' : 'var(--text-secondary)',
+                                        transition: 'all 0.2s',
+                                        minWidth: '36px',
+                                        minHeight: '36px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                    title={isEditMode ? '편집 종료' : '편집 모드'}
+                                >
+                                    <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        {isEditMode ? (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        ) : (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        )}
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 제목 — 중앙 정렬 */}
+                    <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                        <h1 className="text-hero" style={{ marginBottom: '12px' }}>
+                            <span className="text-gradient">
+                                {viewMode === 'trash' ? '휴지통' : '제품 갤러리'}
+                            </span>
+                        </h1>
+                        <p style={{ color: 'var(--text-secondary)' }}>
+                            {viewMode === 'trash'
+                                ? '삭제된 상품은 1일 후 영구 삭제됩니다.'
+                                : 'AI가 소개하는 프리미엄 패션 아이템'}
+                        </p>
                     </div>
 
-                    {/* 관리 모드 토글 및 삭제 버튼 - 우측 상단 배치 */}
-                    <div style={{ position: 'absolute', top: '0', right: '0', display: 'flex', gap: '8px' }}>
-                        {/* 복구 버튼 (휴지통 모드일 때만) */}
-                        {viewMode === 'trash' && selectedToDelete.length > 0 && (
-                            <button
-                                onClick={handleRestoreProducts}
-                                className="badge badge-success"
-                                style={{
-                                    border: 'none', cursor: 'pointer', padding: '8px 16px', fontSize: '12px',
-                                    display: 'flex', alignItems: 'center', gap: '4px'
-                                }}
-                            >
-                                <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                복구 ({selectedToDelete.length})
-                            </button>
-                        )}
-
-                        {(isEditMode || viewMode === 'trash') && selectedToDelete.length > 0 && (
-                            <button
-                                onClick={handleDeleteProducts}
-                                className="badge badge-primary"
-                                style={{
-                                    border: 'none', cursor: 'pointer', padding: '8px 16px', fontSize: '12px',
-                                    background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: '4px'
-                                }}
-                            >
-                                <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                {viewMode === 'trash' ? `영구 삭제 (${selectedToDelete.length})` : `삭제 (${selectedToDelete.length})`}
-                            </button>
-                        )}
-
-                        <button
-                            onClick={() => {
-                                setIsEditMode(!isEditMode);
-                                setSelectedToDelete([]);
-                            }}
-                            style={{
-                                background: 'transparent',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '8px',
-                                cursor: 'pointer',
-                                color: (isEditMode || viewMode === 'trash') ? 'var(--primary-color)' : 'var(--text-secondary)',
-                                transition: 'all 0.2s'
-                            }}
-                            title={isEditMode ? '편집 종료' : '편집 모드'}
-                        >
-                            {/* 휴지통 모드에서는 항상 편집 모드처럼 동작하거나, 아이콘 변경 */}
-                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                {isEditMode ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                )}
-                            </svg>
-                        </button>
+                    {/* 카테고리 필터 바 — 가로 스크롤 */}
+                    <div className="category-filter-wrapper">
+                        <div className="category-filter-scroll">
+                            {availableCategories.map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat || 'all')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        borderRadius: '20px',
+                                        fontSize: '14px',
+                                        fontWeight: selectedCategory === cat ? '600' : '400',
+                                        background: selectedCategory === cat ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                                        color: selectedCategory === cat ? 'var(--bg-card)' : 'var(--text-secondary)',
+                                        border: selectedCategory === cat ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        flexShrink: 0,
+                                        minHeight: '40px',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {cat === 'all' ? '전체 보기' : (cat ? getCategoryDisplayName(cat) : '')}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 

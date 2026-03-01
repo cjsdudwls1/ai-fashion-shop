@@ -1,26 +1,23 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { supabase } from '@/lib/supabase';
-import DaumPostcode from 'react-daum-postcode';
-import toast from 'react-hot-toast';
-
-// 분리된 컴포넌트 임포트
 import ShippingForm from '@/components/checkout/ShippingForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
-import PaymentSection from '@/components/checkout/PaymentSection';
+import { ADMIN_BANK_INFO } from '@/lib/orderUtils';
+import toast from 'react-hot-toast';
 
 export default function CheckoutPage() {
     const router = useRouter();
-    const { items, getTotalPrice, clearCart } = useCartStore();
-    const [loading, setLoading] = useState(false);
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [orderComplete, setOrderComplete] = useState(false);
-    const [guestOrderCode, setGuestOrderCode] = useState('');
-    const [mounted, setMounted] = useState(false);
+    const { items, getTotalPrice, updatePrices, clearCart } = useCartStore();
 
+    // Auth State
+    const [user, setUser] = useState<any>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+
+    // Shipping Info State
     const [shippingInfo, setShippingInfo] = useState({
         name: '',
         phone: '',
@@ -30,239 +27,357 @@ export default function CheckoutPage() {
         memo: ''
     });
 
+    // 입금자명
+    const [depositorName, setDepositorName] = useState('');
+
+    // 실시간 유효성 검사 (#5-3)
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+
+    const [isProcessing, setIsProcessing] = useState(false);
     const [openPostcode, setOpenPostcode] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('card');
 
-    // 로그인 상태 확인 및 기존 배송지 자동 입력
+    // 실시간 유효성 검사 로직
     useEffect(() => {
-        setMounted(true);
-        const checkUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setIsLoggedIn(true);
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('full_name, phone_number')
-                    .eq('id', user.id)
-                    .single();
-                if (profile) {
-                    setShippingInfo(prev => ({
-                        ...prev,
-                        name: profile.full_name || '',
-                        phone: profile.phone_number || ''
-                    }));
-                }
-                const { data: address } = await supabase
-                    .from('addresses')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('is_default', true)
-                    .single();
-                if (address) {
-                    setShippingInfo(prev => ({
-                        ...prev,
-                        zonecode: address.zonecode || '',
-                        roadAddress: address.road_address || '',
-                        detailAddress: address.detail_address || ''
-                    }));
+        const errors: Record<string, string> = {};
+
+        if (touchedFields.name && !shippingInfo.name.trim()) {
+            errors.name = '받는 분 이름을 입력해주세요.';
+        }
+        if (touchedFields.phone) {
+            if (!shippingInfo.phone.trim()) {
+                errors.phone = '연락처를 입력해주세요.';
+            } else if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(shippingInfo.phone.replace(/-/g, '').replace(/^01/, '01'))) {
+                // 간단한 전화번호 형식 체크만
+                if (shippingInfo.phone.replace(/-/g, '').length < 10) {
+                    errors.phone = '올바른 연락처를 입력해주세요.';
                 }
             }
-        };
-        checkUser();
-    }, []);
-
-    // Daum 우편번호 완료 핸들러
-    const handleCompletePostcode = (data: any) => {
-        let fullAddress = data.address;
-        let extraAddress = '';
-
-        if (data.addressType === 'R') {
-            if (data.bname !== '') extraAddress += data.bname;
-            if (data.buildingName !== '') {
-                extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName);
-            }
-            fullAddress += (extraAddress !== '' ? ` (${extraAddress})` : '');
+        }
+        if (touchedFields.detailAddress && !shippingInfo.detailAddress.trim()) {
+            errors.detailAddress = '상세 주소를 입력해주세요.';
+        }
+        if (touchedFields.depositorName && !depositorName.trim()) {
+            errors.depositorName = '입금자명을 입력해주세요.';
         }
 
-        setShippingInfo(prev => ({
-            ...prev,
-            zonecode: data.zonecode,
-            roadAddress: fullAddress
-        }));
-        setOpenPostcode(false);
+        setFieldErrors(errors);
+    }, [shippingInfo, depositorName, touchedFields]);
+
+    const handleBlur = (fieldName: string) => {
+        setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
     };
 
-    if (!mounted) return <div className="min-h-screen bg-[var(--bg-dark)] pt-24 pb-12"></div>;
+    // 최신 가격 동기화
+    useEffect(() => {
+        const fetchLatestPrices = async () => {
+            const currentItems = useCartStore.getState().items;
+            if (currentItems.length === 0) return;
 
-    if (items.length === 0 && !orderComplete) {
-        return (
-            <div className="min-h-screen bg-[var(--bg-dark)] flex flex-col items-center justify-center">
-                <p className="text-[var(--text-secondary)] mb-4">장바구니가 비어있습니다.</p>
-                <button onClick={() => router.push('/products')} className="text-indigo-500 font-bold underline">쇼핑하러 가기</button>
-            </div>
-        );
-    }
+            const ids = [...new Set(currentItems.map(item => item.id))];
+            try {
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('id, price')
+                    .in('id', ids);
 
-    // 주문 완료 화면
-    if (orderComplete) {
-        return (
-            <div className="min-h-screen bg-[var(--bg-dark)] flex items-center justify-center px-4">
-                <div className="bg-[var(--bg-card)] rounded-3xl shadow-xl border border-[var(--border-color)] p-8 sm:p-12 max-w-lg w-full text-center">
-                    <div className="w-20 h-20 bg-green-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h2 className="text-3xl font-black text-[var(--text-primary)] mb-3">주문 완료</h2>
-                    <p className="text-[var(--text-secondary)] mb-8">주문이 성공적으로 접수되었습니다.</p>
+                if (!error && data) {
+                    const priceMap: Record<string, number> = {};
+                    data.forEach(p => { priceMap[p.id] = p.price; });
+                    useCartStore.getState().updatePrices(priceMap);
+                }
+            } catch (err) {
+                console.error("Failed to fetch latest prices", err);
+            }
+        };
+        fetchLatestPrices();
+    }, []);
 
-                    {guestOrderCode && (
-                        <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-6 mb-8">
-                            <p className="text-sm font-bold text-amber-500 mb-2">비회원 주문 조회 코드</p>
-                            <p className="text-3xl font-black text-amber-400 tracking-widest mb-3">{guestOrderCode}</p>
-                            <p className="text-xs text-amber-500/80">
-                                이 코드를 기억해주세요! 주문 조회 시 필요합니다.
-                            </p>
-                        </div>
-                    )}
+    // 인증 체크 + 회원 데이터 조회
+    useEffect(() => {
+        const checkAuthAndLoadData = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    setUser(user);
 
-                    <div className="space-y-3">
-                        {guestOrderCode ? (
-                            <button
-                                onClick={() => router.push('/order-lookup')}
-                                className="w-full h-14 bg-[var(--text-primary)] text-[var(--bg-dark)] font-bold rounded-xl hover:opacity-90 transition-all"
-                            >
-                                주문 조회하기
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => router.push('/profile')}
-                                className="w-full h-14 bg-[var(--text-primary)] text-[var(--bg-dark)] font-bold rounded-xl hover:opacity-90 transition-all"
-                            >
-                                주문 내역 보기
-                            </button>
-                        )}
-                        <button
-                            onClick={() => router.push('/products')}
-                            className="w-full h-14 bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-bold rounded-xl hover:bg-[var(--border-color)] transition-all"
-                        >
-                            쇼핑 계속하기
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('full_name, phone_number')
+                        .eq('id', user.id)
+                        .maybeSingle();
 
-    const handlePayment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
+                    const { data: address } = await supabase
+                        .from('addresses')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .eq('is_default', true)
+                        .maybeSingle();
 
-        if (!shippingInfo.name || !shippingInfo.phone || !shippingInfo.roadAddress) {
-            toast.error('배송지 정보를 모두 입력해주세요.');
-            setLoading(false);
+                    const fallbackName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || '';
+                    const fallbackPhone = profile?.phone_number || user?.phone || user?.user_metadata?.phone_number || '';
+
+                    setShippingInfo(prev => ({
+                        ...prev,
+                        name: fallbackName,
+                        phone: fallbackPhone,
+                    }));
+                    setDepositorName(fallbackName);
+
+                    if (address) {
+                        setShippingInfo(prev => ({
+                            ...prev,
+                            zonecode: address.zonecode || '',
+                            roadAddress: address.road_address || '',
+                            detailAddress: address.detail_address || '',
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            } finally {
+                setAuthLoading(false);
+            }
+        };
+
+        checkAuthAndLoadData();
+    }, [router]);
+
+    const isOrderCompleted = useRef(false);
+
+    // 장바구니 비어있으면 리다이렉트
+    useEffect(() => {
+        if (!authLoading && items.length === 0 && !isOrderCompleted.current) {
+            toast.error('장바구니가 비어있습니다.');
+            router.push('/cart');
+        }
+    }, [items, router, authLoading]);
+
+    // Handle Payment & Validation
+    const handlePayment = async () => {
+        // 모든 필드 touched 처리
+        setTouchedFields({
+            name: true,
+            phone: true,
+            detailAddress: true,
+            depositorName: true,
+        });
+
+        if (!shippingInfo.name.trim()) {
+            toast.error('받는 분 이름을 입력해주세요.');
+            return;
+        }
+        if (!shippingInfo.phone.trim()) {
+            toast.error('연락처를 입력해주세요.');
+            return;
+        }
+        if (!shippingInfo.roadAddress) {
+            toast.error('주소를 검색해주세요.');
+            return;
+        }
+        if (!shippingInfo.detailAddress.trim()) {
+            toast.error('상세 주소를 입력해주세요.');
+            return;
+        }
+        if (!depositorName.trim()) {
+            toast.error('입금자명을 입력해주세요.');
             return;
         }
 
+        setIsProcessing(true);
         try {
-            const fullAddress = shippingInfo.detailAddress
-                ? `[${shippingInfo.zonecode}] ${shippingInfo.roadAddress}, ${shippingInfo.detailAddress}`
-                : `[${shippingInfo.zonecode}] ${shippingInfo.roadAddress}`;
-
-            // Minimize payload by removing image data (Base64 strings are large)
-            const orderItems = items.map(item => ({
-                id: item.id,
-                quantity: item.quantity,
-                selectedColor: item.selectedColor,
-                selectedSize: item.selectedSize,
-                price: item.price // Note: Ideally price should be verified on server
-            }));
-
-            const { data, error } = await supabase.rpc('complete_order', {
-                p_items: orderItems,
-                p_shipping_info: {
-                    name: shippingInfo.name,
-                    phone: shippingInfo.phone,
-                    address: fullAddress,
-                    memo: shippingInfo.memo
-                },
-                p_total_amount: getTotalPrice()
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user?.id,
+                    items: items.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                        price: item.price,
+                        quantity: item.quantity,
+                        selectedColor: item.selectedColor,
+                        selectedSize: item.selectedSize,
+                    })),
+                    shippingInfo,
+                    depositorName,
+                    totalAmount: getTotalPrice(),
+                }),
             });
 
-            if (error) throw error;
+            const data = await response.json();
 
-            if (data?.guest_order_code) {
-                setGuestOrderCode(data.guest_order_code);
+            if (!response.ok) {
+                throw new Error(data.error || '주문 처리 중 오류가 발생했습니다.');
             }
 
+            isOrderCompleted.current = true;
             clearCart();
-            setOrderComplete(true);
-            toast.success('주문이 완료되었습니다!');
 
+            if (!user) {
+                toast.success(`비회원 주문이 완료되었습니다!\n주문조회 코드: ${data.orderCode}\n꼭 기억해주세요!`, { duration: 10000 });
+                router.push(`/order-lookup?code=${data.orderCode}&phone=${encodeURIComponent(shippingInfo.phone)}`);
+            } else {
+                toast.success('주문이 완료되었습니다!');
+                router.push('/profile?tab=orders');
+            }
         } catch (error: any) {
-            console.error('Payment Error:', error);
-            toast.error('결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+            console.error(error);
+            toast.error(error.message || '결제 처리 중 오류가 발생했습니다.');
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     };
 
+    // Daum Postcode Script Loading
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+        script.async = true;
+        document.body.appendChild(script);
+
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    // Postcode Handler
+    useEffect(() => {
+        if (openPostcode && window.daum && window.daum.Postcode) {
+            new window.daum.Postcode({
+                oncomplete: function (data: any) {
+                    setShippingInfo(prev => ({
+                        ...prev,
+                        zonecode: data.zonecode,
+                        roadAddress: data.roadAddress,
+                    }));
+                    setOpenPostcode(false);
+                },
+                onclose: () => {
+                    setOpenPostcode(false);
+                }
+            }).open();
+        }
+    }, [openPostcode]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-[var(--bg-dark)] pt-32 pb-24 px-4 sm:px-6 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div>
+            </div>
+        );
+    }
+
+    if (items.length === 0) return null;
+
+    const totalPrice = getTotalPrice();
+
     return (
-        <div className="min-h-screen bg-[var(--bg-dark)] pt-24 pb-24">
-            <div className="container-main">
-                <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">주문/결제</h1>
-                    {!isLoggedIn && (
-                        <div className="flex items-center gap-2 mb-6 bg-indigo-500/10 text-indigo-400 text-sm font-medium px-4 py-3 rounded-xl border border-indigo-500/20">
-                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>비회원 주문입니다. 주문 완료 후 <strong>주문 조회 코드</strong>가 발급됩니다.</span>
-                        </div>
-                    )}
+        <div className="min-h-screen bg-[var(--bg-dark)] pt-28 pb-24 checkout-page-wrapper">
+            <div className="checkout-container">
+                <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '32px' }}>
+                    주문/결제
+                </h1>
 
-                    <form onSubmit={handlePayment} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* 왼쪽: 배송 정보 & 상품 정보 */}
-                        <div className="space-y-6">
-                            <ShippingForm
-                                shippingInfo={shippingInfo}
-                                setShippingInfo={setShippingInfo}
-                                setOpenPostcode={setOpenPostcode}
-                            />
-                            <OrderSummary items={items} />
-                        </div>
-
-                        {/* 오른쪽: 결제 정보 */}
-                        <PaymentSection
-                            totalPrice={getTotalPrice()}
-                            paymentMethod={paymentMethod}
-                            setPaymentMethod={setPaymentMethod}
-                            loading={loading}
+                <div className="checkout-grid">
+                    {/* Left Column: 배송/입금 정보 (70%) */}
+                    <div className="checkout-left" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* 배송지 정보 */}
+                        <ShippingForm
+                            shippingInfo={shippingInfo}
+                            setShippingInfo={setShippingInfo}
+                            setOpenPostcode={setOpenPostcode}
+                            fieldErrors={fieldErrors}
+                            onBlur={handleBlur}
                         />
-                    </form>
+
+                        {/* 입금 정보 섹션 (#6 톤다운) */}
+                        <section className="checkout-section">
+                            <h2 className="checkout-section-title">입금 정보</h2>
+
+                            {/* 계좌 안내 — light gray, 아이콘 제거, 계좌번호만 강조 */}
+                            <div className="deposit-info-box">
+                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                    아래 계좌로 입금해주세요
+                                </p>
+                                <p className="account-number">
+                                    {ADMIN_BANK_INFO.bankName} {ADMIN_BANK_INFO.accountNumber}
+                                </p>
+                                <p className="account-holder">
+                                    예금주: {ADMIN_BANK_INFO.accountHolder}
+                                </p>
+                                <p className="trust-msg">
+                                    주문 완료 후 입금해주시면, 평균 10분 이내 확인됩니다.<br />
+                                    또는 <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>010-7773-1342</strong>로 연락 후 구매하실 수 있습니다.
+                                </p>
+                            </div>
+
+                            {/* 입금자명 입력 */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                    입금자명
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    className={`checkout-input ${fieldErrors.depositorName ? 'input-error' : ''}`}
+                                    placeholder="실제 입금 시 사용하는 이름"
+                                    value={depositorName}
+                                    onChange={e => setDepositorName(e.target.value)}
+                                    onBlur={() => handleBlur('depositorName')}
+                                />
+                                {fieldErrors.depositorName && (
+                                    <p className="checkout-input-error-msg">{fieldErrors.depositorName}</p>
+                                )}
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    입금 시 사용하실 이름과 동일하게 입력해주세요.
+                                </p>
+                            </div>
+                        </section>
+                    </div>
+
+                    {/* Right: Order Summary (30%) — desktop only */}
+                    <div className="checkout-right hidden lg:block">
+                        <OrderSummary
+                            items={items}
+                            totalPrice={totalPrice}
+                            isProcessing={isProcessing}
+                            onPayment={handlePayment}
+                        />
+                    </div>
                 </div>
 
-                {/* Daum Postcode 모달 */}
-                {openPostcode && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative overflow-hidden">
-                            <div className="flex justify-between items-center p-5 border-b">
-                                <h3 className="text-lg font-bold text-gray-900">주소 검색</h3>
-                                <button
-                                    onClick={() => setOpenPostcode(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-all"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="h-[450px]">
-                                <DaumPostcode onComplete={handleCompletePostcode} style={{ height: '100%' }} />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Mobile: 주문 요약 인라인 표시 */}
+                <div className="lg:hidden" style={{ marginTop: '24px' }}>
+                    <OrderSummary
+                        items={items}
+                        totalPrice={totalPrice}
+                        isProcessing={isProcessing}
+                        onPayment={() => { }} // 모바일은 sticky 버튼으로 결제
+                        hideCta={true}
+                    />
+                </div>
+            </div>
+
+            {/* Mobile: 하단 sticky 결제 버튼 (#10) */}
+            <div className="checkout-mobile-sticky-btn lg:hidden">
+                <button
+                    onClick={handlePayment}
+                    disabled={isProcessing}
+                    className="checkout-cta-btn"
+                >
+                    {isProcessing ? (
+                        <>
+                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            처리 중...
+                        </>
+                    ) : (
+                        `${totalPrice.toLocaleString()}원 결제하기`
+                    )}
+                </button>
             </div>
         </div>
     );

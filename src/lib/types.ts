@@ -1,3 +1,6 @@
+// 역할 타입 정의
+export type UserRole = 'user' | 'admin';
+
 // 상품 타입 정의
 
 export interface ColorStock {
@@ -24,24 +27,31 @@ export interface Product {
   galleryImages: { url: string; color?: string; isPrimary?: boolean }[]; // New Gallery field
   videoUrl: string | null;
   audioUrl: string | null;       // TTS 나레이션 오디오 (Base64 Data URL)
-  videoStatus: 'pending' | 'generating' | 'completed' | 'failed';
+  videoStatus: 'pending' | 'generating' | 'completed' | 'failed' | 'tryon_polling' | 'video_polling';
+  klingTaskId?: string | null;
+  tryOnImageUrl?: string | null;
   videoErrorReason?: string; // New field for error message
   price?: number;
   createdAt: Date;
   deletedAt?: Date | null; // For soft delete
+  mediaGenerationType?: 'video' | 'image' | 'none'; // 미디어 생성 타입
+  narrationText?: string | null; // AI 영상 모델 대사
+  videoModel?: string | null; // AI 영상 생성 모델
 }
 
 export interface ProductInput {
   name: string;
-  price: number; // Added price field
-  imageBase64: string; // Primary for AI
-  galleryImages?: { base64: string; color?: string; isPrimary: boolean }[]; // New
+  price: number;
+  imageUrl?: string;
+  galleryImages?: { base64?: string; url?: string; color?: string; isPrimary?: boolean }[];
   fabric: string;
   gender: Gender;
   category?: string;
   narrationText?: string;
   colorsText: string;
   sizesText: string;
+  mediaGenerationType?: 'video' | 'image' | 'none';
+  videoModel?: string;
 }
 
 export interface Profile {
@@ -51,6 +61,7 @@ export interface Profile {
   phone_number: string | null;
   avatar_url: string | null;
   is_setup_finished: boolean;
+  role: UserRole;
   updated_at?: string;
 }
 

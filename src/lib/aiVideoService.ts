@@ -1,394 +1,268 @@
-// AI 아바타 영상 생성 서비스 - Kling AI + ElevenLabs TTS 연동
-// 워크플로우: 1) Virtual Try-On → 2) Image-to-Video (kling-v2-6, 무음) → 3) ElevenLabs TTS 나레이션 생성
+// AI 동영상 생성 서비스 - Google Veo 3.1 Fast
+// 워크플로우: 상품 이미지 참조 + 텍스트 프롬프트 → 동영상+오디오 생성
 
+import { GoogleGenAI } from '@google/genai';
 import { productStore } from './productStore';
 import { supabaseAdmin } from './supabaseAdmin';
 import type { Gender } from './types';
-import { generateProductNarration, audioToDataUrl } from './ttsService';
-import jwt from 'jsonwebtoken';
 
 // ============================================================================
-// Kling AI API 설정
+// Google Veo 3.1 Fast API 설정
 // ============================================================================
 
-const KLING_ACCESS_KEY = process.env.KLING_ACCESS_KEY || '';
-const KLING_SECRET_KEY = process.env.KLING_SECRET_KEY || '';
-const KLING_API_BASE = 'https://api-singapore.klingai.com';
+const GOOGLE_API_KEY = process.env.GEMINI_API_KEY || '';
 
-// 기본 모델 이미지 (Virtual Try-On에 사용) - 성별별 모델
-const MODEL_IMAGES = {
-    female: 'https://res.cloudinary.com/dpaqhv0ay/image/upload/v1770710879/Gemini_Generated_Image_lqt41ilqt41ilqt4_pnxc3t.png',
-    male: 'https://res.cloudinary.com/dpaqhv0ay/image/upload/v1770792500/Gemini_Generated_Image_9trm2p9trm2p9trm_v5hkp0.png'
+const ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+
+// Veo 모델 및 기본 설정
+const VEO_MODEL = 'veo-3.1-fast-generate-preview';
+const VEO_RESOLUTION = '720p'; // Veo 3.1 Fast는 720p만 지원
+const VEO_DURATION = 8; // Veo는 4, 6, 8초만 지원 (7초에 가장 가까운 값)
+const VEO_ASPECT_RATIO = '16:9';
+
+// ============================================================================
+// 프롬프트 생성 유틸리티
+// ============================================================================
+
+const CATEGORY_MAP: Record<string, string> = {
+    'short-sleeve': 'short-sleeve T-shirt',
+    'long-sleeve': 'long-sleeve T-shirt',
+    'sleeveless': 'sleeveless top',
+    'shirt': 'shirt',
+    'knit': 'knit sweater',
+    'hoodie': 'hoodie',
+    'pants': 'pants',
+    'shorts': 'shorts',
+    'skirt': 'skirt',
+    'denim': 'denim jeans',
+    'slacks': 'slacks',
+    'jacket': 'jacket',
+    'coat': 'coat',
+    'padding': 'padded jacket',
+    'cardigan': 'cardigan',
+    'onepiece': 'one-piece dress',
+    'set': 'coordinated set',
+    'underwear': 'underwear',
+    'etc': 'fashion item',
 };
 
-
-
-// ============================================================================
-// JWT 토큰 생성
-// ============================================================================
-function generateJWT(): string {
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-        iss: KLING_ACCESS_KEY,
-        exp: now + 300,
-        nbf: now - 60
-    };
-
-    const token = jwt.sign(payload, KLING_SECRET_KEY, {
-        algorithm: 'HS256',
-        noTimestamp: true,
-        header: { alg: 'HS256', typ: 'JWT' }
-    });
-
-    return token;
-}
-
-// ============================================================================
-// 공통 API 헬퍼
-// ============================================================================
-async function klingRequest(endpoint: string, method: string = 'GET', body?: object): Promise<object> {
-    const token = generateJWT();
-    const url = `${KLING_API_BASE}${endpoint}`;
-    console.log(`[Kling API] ${method} ${endpoint}`);
-
-    const options: RequestInit = {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        }
-    };
-    if (body) {
-        options.body = JSON.stringify(body);
-    }
-    const response = await fetch(url, options);
-    const data = await response.json();
-
-    if ((data as { code?: number }).code !== 0) {
-        console.error(`[Kling API] 에러 응답:`, JSON.stringify(data, null, 2));
-    }
-    return data;
-}
-
-// 작업 결과 폴링
-async function pollTask(endpoint: string, maxAttempts: number = 60): Promise<{ success: boolean; data?: object; error?: string }> {
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        try {
-            const statusData = await klingRequest(endpoint) as {
-                code?: number;
-                data?: { task_status?: string; task_result?: object; task_status_msg?: string }
-            };
-
-            if (statusData.code !== 0) {
-                console.warn(`[Kling] 폴링 응답 에러:`, statusData);
-                attempts++;
-                continue;
-            }
-
-            const status = statusData.data?.task_status;
-            console.log(`[Kling] 폴링 ${attempts + 1}/${maxAttempts}: ${status} ${statusData.data?.task_status_msg || ''}`);
-
-            if (status === 'succeed') {
-                return { success: true, data: statusData.data?.task_result };
-            } else if (status === 'failed') {
-                return { success: false, error: statusData.data?.task_status_msg || '작업 실패' };
-            }
-        } catch (err) {
-            console.warn(`[Kling] 폴링 네트워크 에러:`, err);
-        }
-        attempts++;
-    }
-    return { success: false, error: '시간 초과' };
-}
-
-// ============================================================================
-// Base64 이미지 처리 유틸리티
-// ============================================================================
-function stripBase64Prefix(base64String: string): string {
-    if (base64String.startsWith('data:')) {
-        const commaIndex = base64String.indexOf(',');
-        if (commaIndex !== -1) {
-            return base64String.substring(commaIndex + 1);
-        }
-    }
-    return base64String;
-}
-
-function isBase64Image(str: string): boolean {
-    return str.startsWith('data:image');
-}
-
-// ============================================================================
-// 1단계: Virtual Try-On (의류를 모델에게 입히기)
-// ============================================================================
-async function callVirtualTryOn(
-    clothImageInput: string,
-    gender: 'male' | 'female'
-): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
-    console.log(`[Kling] ===== 1단계: Virtual Try-On =====`);
-    console.log(`[Kling] 모델: ${gender === 'female' ? '여성' : '남성'}`);
-    console.log(`[Kling] 의류 이미지: ${isBase64Image(clothImageInput) ? 'Base64 (직접 전달)' : 'URL'}`);
-
-    try {
-        const clothImage = isBase64Image(clothImageInput)
-            ? stripBase64Prefix(clothImageInput)
-            : clothImageInput;
-
-        const data = await klingRequest('/v1/images/kolors-virtual-try-on', 'POST', {
-            model_name: 'kolors-virtual-try-on-v1-5',
-            human_image: MODEL_IMAGES[gender],
-            cloth_image: clothImage
-        }) as { code?: number; message?: string; data?: { task_id?: string } };
-
-        if (data.code !== 0) {
-            console.error(`[Kling] Try-On 요청 실패: ${data.message}`);
-            return { success: false, error: data.message || 'Virtual Try-On 요청 실패' };
-        }
-
-        const taskId = data.data?.task_id;
-        if (!taskId) {
-            return { success: false, error: 'task_id 없음' };
-        }
-        console.log(`[Kling] Try-On 작업 ID: ${taskId}`);
-
-        const result = await pollTask(`/v1/images/kolors-virtual-try-on/${taskId}`, 36);
-        if (result.success) {
-            const resultData = result.data as { images?: Array<{ url?: string }> };
-            const imageUrl = resultData?.images?.[0]?.url;
-            if (imageUrl) {
-                console.log(`[Kling] Try-On 성공!`);
-                return { success: true, imageUrl };
-            }
-            console.error('[Kling] Try-On 결과에 이미지 URL 없음:', JSON.stringify(result.data));
-        }
-        return { success: false, error: result.error || '이미지 URL 없음' };
-    } catch (error) {
-        console.error('[Kling] Try-On 오류:', error);
-        return { success: false, error: String(error) };
-    }
-}
-
-
-
-// ============================================================================
-// 2단계: Image-to-Video + 음성 (kling-v2-6, sound:"on" + voice_list)
-// ============================================================================
-async function callImageToVideo(
-    imageUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
-): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
-    console.log(`[Kling] ===== 2단계: Image-to-Video (Sound Off: 화질 우선) =====`);
-    console.log(`[Kling] 입력 이미지: ${imageUrl.substring(0, 80)}...`);
-
-    // 화질을 위해 오디오 생성 비활성화 (추후 별도 TTS 합성 권장)
-    // 한글 텍스트 제거 및 purely visual prompt 사용
-    // productInfo.gender가 'male'/'female'이므로 그대로 사용하거나 영문으로 매핑
+function buildVideoPrompt(productInfo: {
+    name: string;
+    fabric: string;
+    gender: Gender;
+    category?: string;
+    hasReferenceImage?: boolean;
+    narrationText?: string;
+}): string {
     const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
-    const categoryStr = productInfo.category ? ` ${productInfo.category}` : '';
+    const categoryStr = (productInfo.category && CATEGORY_MAP[productInfo.category]) || 'fashion item';
 
-    const prompt = `A professional ${genderStr} fashion model wearing ${productInfo.name}${categoryStr} in a studio with soft lighting. The model turns to show the ${productInfo.fabric} fabric texture. High quality, 4K, cinematic fashion video.`;
+    // 나레이션 대사 결정: 사용자 입력이 있으면 사용, 없으면 자동 생성
+    const narration = productInfo.narrationText
+        ? productInfo.narrationText
+        : `${productInfo.name}. ${productInfo.fabric} 소재의 프리미엄 ${categoryStr}입니다.`;
 
-    console.log(`[Kling] 프롬프트: ${prompt}`);
+    if (productInfo.hasReferenceImage) {
+        // 참조 이미지가 있을 때: 이미지 속 옷을 정확히 재현하도록 유도
+        return `A high-end fashion commercial video. A professional ${genderStr} model wearing the exact garment shown in the reference image - "${productInfo.name}", made of ${productInfo.fabric}. The model must wear this specific ${categoryStr} from the reference image, preserving the exact color, pattern, and design details. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video.`;
+    }
 
-    // API 요청 바디 구성 (공식 문서 기준)
-    const requestBody: Record<string, unknown> = {
-        model_name: 'kling-v2-6',
-        image: imageUrl,
-        prompt: prompt,
-        negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
-        mode: 'pro',
-        duration: '10',
-        aspect_ratio: '9:16',
-        sound: 'off'  // 화질 우선 (오디오 없음)
-    };
+    // 참조 이미지가 없을 때: 기존 텍스트 전용 프롬프트
+    return `A high-end fashion commercial video. A professional ${genderStr} model wearing "${productInfo.name}", a premium ${productInfo.fabric} ${categoryStr}. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video.`;
+}
 
-
-    console.log(`[Kling] 요청 파라미터:`, JSON.stringify({ ...requestBody, image: '(생략)' }));
-
+// ============================================================================
+// 이미지 URL → Base64 변환 유틸리티
+// ============================================================================
+async function fetchImageAsBase64(imageUrl: string): Promise<{ imageBytes: string; mimeType: string } | null> {
     try {
-        const data = await klingRequest('/v1/videos/image2video', 'POST', requestBody) as { code?: number; message?: string; data?: { task_id?: string } };
+        console.log(`[Veo] 참조 이미지 다운로드: ${imageUrl.substring(0, 80)}...`);
+        const response = await fetch(imageUrl, { redirect: 'follow' });
 
-        if (data.code !== 0) {
-            console.error(`[Kling] Video 생성 요청 실패: ${data.message}`);
-            if (data.code === 1203 || data.code === 1201) {
-                console.warn('[Kling] kling-v2-6 미지원 → kling-v1-6으로 재시도');
-                return await callImageToVideoFallback(imageUrl, productInfo);
-            }
-            return { success: false, error: data.message || 'Video 생성 요청 실패' };
+        if (!response.ok) {
+            console.warn(`[Veo] 이미지 다운로드 실패: HTTP ${response.status}`);
+            return null;
         }
 
-        const taskId = data.data?.task_id;
-        if (!taskId) return { success: false, error: 'task_id 없음' };
-        console.log(`[Kling] Video 작업 ID: ${taskId}`);
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
+        const arrayBuffer = await response.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-        const result = await pollTask(`/v1/videos/image2video/${taskId}`, 120);
-        if (result.success) {
-            const resultData = result.data as { videos?: Array<{ url?: string }> };
-            const videoUrl = resultData?.videos?.[0]?.url;
-            if (videoUrl) {
-                console.log(`[Kling] Video + Audio 생성 성공!`);
-                return { success: true, videoUrl };
-            }
-            console.error('[Kling] Video 결과에 URL 없음:', JSON.stringify(result.data));
+        // MIME 타입 정규화
+        let mimeType = contentType.split(';')[0].trim();
+        if (!mimeType.startsWith('image/')) {
+            mimeType = 'image/jpeg';
         }
-        return { success: false, error: result.error || '비디오 URL 없음' };
+
+        console.log(`[Veo] 참조 이미지 준비 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB, ${mimeType})`);
+        return { imageBytes: base64, mimeType };
     } catch (error) {
-        console.error('[Kling] Video 오류:', error);
-        return { success: false, error: String(error) };
+        console.warn(`[Veo] 참조 이미지 다운로드 오류:`, error);
+        return null;
     }
 }
 
-// kling-v2-6 실패 시 폴백
-async function callImageToVideoFallback(
-    imageUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string }
-): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
-    console.log(`[Kling] === 폴백: kling-v1-6 ===`);
-    const genderText = productInfo.gender === 'female' ? '여성' : '남성';
-    const prompt = `A professional ${genderText} fashion model wearing ${productInfo.name}. Natural movements, turning to show ${productInfo.fabric} fabric texture. High quality, 4K, studio lighting.`;
-
+// ============================================================================
+// Veo 영상 생성 트리거 (Non-blocking)
+// imageUrl이 있으면 참조 이미지로 전달하여 실제 상품과 일치하는 영상 생성
+// ============================================================================
+export async function triggerVeoVideo(
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string; narrationText?: string; videoModel?: string | null },
+    imageUrl?: string
+): Promise<{ success: boolean; operationName?: string; error?: string }> {
     try {
-        const data = await klingRequest('/v1/videos/image2video', 'POST', {
-            model_name: 'kling-v1-6',
-            image: imageUrl,
+        // 참조 이미지 준비
+        let referenceImageData: { imageBytes: string; mimeType: string } | null = null;
+        if (imageUrl) {
+            referenceImageData = await fetchImageAsBase64(imageUrl);
+        }
+
+        const prompt = buildVideoPrompt({
+            ...productInfo,
+            hasReferenceImage: !!referenceImageData,
+        });
+
+        console.log(`[Veo] 영상 생성 트리거 시작`);
+        const targetModel = productInfo.videoModel || VEO_MODEL;
+        console.log(`[Veo] 모델: ${targetModel}`);
+        console.log(`[Veo] 해상도: ${VEO_RESOLUTION}, 길이: ${VEO_DURATION}초, 비율: ${VEO_ASPECT_RATIO}`);
+        console.log(`[Veo] 참조 이미지: ${referenceImageData ? '있음' : '없음 (텍스트 전용)'}`);
+        console.log(`[Veo] 프롬프트: ${prompt.substring(0, 120)}...`);
+
+        // Veo API 호출 옵션 구성
+        const generateOptions: any = {
+            model: targetModel,
             prompt: prompt,
-            negative_prompt: 'blurry, distorted, ugly, low quality, static, deformed face, bad anatomy',
-            cfg_scale: 0.5,
-            mode: 'pro',
-            duration: '10',
-            aspect_ratio: '9:16'
-        }) as { code?: number; message?: string; data?: { task_id?: string } };
+            config: {
+                aspectRatio: VEO_ASPECT_RATIO,
+                resolution: VEO_RESOLUTION,
+                durationSeconds: VEO_DURATION,
+                personGeneration: 'allow_adult',
+                numberOfVideos: 1,
+            },
+        };
 
-        if (data.code !== 0) return { success: false, error: data.message || 'Video 폴백 실패' };
-
-        const taskId = data.data?.task_id;
-        if (!taskId) return { success: false, error: 'task_id 없음' };
-        console.log(`[Kling] 폴백 Video 작업 ID: ${taskId}`);
-
-        const result = await pollTask(`/v1/videos/image2video/${taskId}`, 120);
-        if (result.success) {
-            const resultData = result.data as { videos?: Array<{ url?: string }> };
-            const videoUrl = resultData?.videos?.[0]?.url;
-            if (videoUrl) {
-                console.log(`[Kling] 폴백 Video 생성 성공`);
-                return { success: true, videoUrl };
-            }
+        // 참조 이미지가 있으면 referenceImages로 전달 (상품 외형 보존)
+        if (referenceImageData) {
+            generateOptions.config.referenceImages = [
+                {
+                    image: {
+                        imageBytes: referenceImageData.imageBytes,
+                        mimeType: referenceImageData.mimeType,
+                    },
+                    referenceType: 'asset',
+                },
+            ];
+            console.log(`[Veo] referenceImages에 상품 이미지 1장 첨부 (asset 타입)`);
         }
-        return { success: false, error: result.error || '비디오 URL 없음' };
+
+        const operation = await ai.models.generateVideos(generateOptions);
+
+        // operation.name이 폴링에 필요한 고유 식별자
+        const operationName = (operation as any).name;
+        if (!operationName) {
+            console.error('[Veo] operation name 없음:', JSON.stringify(operation));
+            return { success: false, error: 'Operation name을 받지 못했습니다.' };
+        }
+
+        console.log(`[Veo] 영상 생성 트리거 성공, Operation: ${operationName}`);
+        return { success: true, operationName };
     } catch (error) {
+        console.error('[Veo] 영상 생성 트리거 오류:', error);
         return { success: false, error: String(error) };
     }
 }
 
+// ============================================================================
+// Veo 영상 생성 상태 확인 (폴링)
+// ============================================================================
+export async function checkVeoVideo(operationName: string): Promise<{
+    status: 'running' | 'succeed' | 'failed';
+    videoUri?: string;
+    error?: string;
+}> {
+    try {
+        // REST API를 사용하여 operation 상태를 폴링
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+            {
+                headers: {
+                    'x-goog-api-key': GOOGLE_API_KEY,
+                },
+            }
+        );
 
+        if (!response.ok) {
+            console.error(`[Veo] 폴링 HTTP 에러: ${response.status}`);
+            return { status: 'running', error: `HTTP ${response.status}` };
+        }
+
+        const data = await response.json();
+
+        if (data.done === true) {
+            // 완료 - 영상 URI 추출
+            const videoUri = data.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+            if (videoUri) {
+                console.log(`[Veo] 영상 생성 완료! URI: ${videoUri.substring(0, 80)}...`);
+                return { status: 'succeed', videoUri };
+            }
+
+            // 에러로 완료된 경우
+            const errorMsg = data.error?.message || '영상 URI를 찾을 수 없습니다.';
+            console.error(`[Veo] 영상 생성 실패:`, errorMsg);
+            return { status: 'failed', error: errorMsg };
+        }
+
+        // 아직 진행 중
+        console.log(`[Veo] 영상 생성 진행 중...`);
+        return { status: 'running' };
+    } catch (error) {
+        console.error('[Veo] 폴링 오류:', error);
+        return { status: 'running', error: String(error) };
+    }
+}
 
 // ============================================================================
-// 통합 함수 - 전체 워크플로우 실행
-// 1) Virtual Try-On → 2) Image-to-Video (무음) → 3) ElevenLabs TTS 나레이션
-// ============================================================================
-// 1) Virtual Try-On → 2) Image-to-Video (무음) → 3) ElevenLabs TTS 나레이션
+// 통합 함수 - Veo 트리거만 실행 (서버리스 타임아웃 호환)
+// 실제 폴링과 다운로드는 sync/route.ts Cron Worker에서 처리
 // ============================================================================
 export async function generateProductVideo(
     productId: string,
     imageBase64OrUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string; narrationText?: string }
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string; narrationText?: string; videoModel?: string | null }
 ): Promise<void> {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`[AI Service] 영상+음성 생성 시작: ${productId}`);
-    console.log(`[AI Service] 상품: ${productInfo.name} (${productInfo.gender === 'female' ? '여성복' : '남성복'})`);
-    console.log(`[AI Service] 소재: ${productInfo.fabric}`);
-    console.log(`[AI Service] 워크플로우: Try-On → Image-to-Video (무음) → ElevenLabs TTS 나레이션`);
-    console.log(`${'='.repeat(60)}\n`);
+    console.log(`[Veo Service] 영상 생성 트리거: ${productId} - ${productInfo.name}`);
 
     try {
-        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, supabaseAdmin);
+        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, undefined, undefined, supabaseAdmin);
 
-        // ===== 남녀공용(Unisex) 확률 로직 =====
-        let targetGender: 'female' | 'male' = 'female'; // Default
+        // Veo 영상 생성 트리거 (API 호출 1회, 즉시 반환) - 이미지 참조 포함
+        const triggerResult = await triggerVeoVideo(productInfo, imageBase64OrUrl);
 
-        if (productInfo.gender === 'unisex') {
-            const isFemale = Math.random() < 0.75; // 75% 확률로 여성
-            targetGender = isFemale ? 'female' : 'male';
-            console.log(`[AI Service] 남녀공용(Unisex) 감지됨 → ${targetGender === 'female' ? '여성' : '남성'} 모델로 결정 (75:25 확률)`);
-        } else {
-            targetGender = productInfo.gender;
+        if (!triggerResult.success || !triggerResult.operationName) {
+            const errorMsg = triggerResult.error || '영상 생성 트리거 실패';
+            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, undefined, undefined, supabaseAdmin);
+            throw new Error(errorMsg);
         }
 
-        const productInfoForGeneration = {
-            ...productInfo,
-            gender: targetGender
-        };
+        // Operation name 저장 후 즉시 반환 (폴링은 sync/route.ts에서)
+        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, triggerResult.operationName, undefined, supabaseAdmin);
+        console.log(`[Veo Service] 트리거 완료, 폴링은 Sync Worker에 위임: ${triggerResult.operationName}`);
 
-        // ===== 1단계: Virtual Try-On =====
-        const tryOnResult = await callVirtualTryOn(imageBase64OrUrl, targetGender);
-
-        let imageForVideo: string;
-        if (tryOnResult.success && tryOnResult.imageUrl) {
-            imageForVideo = tryOnResult.imageUrl;
-            console.log(`\n[AI Service] 1단계 결과: 성공 - 모델에 의류 착용 완료\n`);
-        } else {
-            console.warn(`\n[AI Service] 1단계 결과: 실패 (${tryOnResult.error})`);
-            console.warn('[AI Service] → Try-On 건너뛰고 원본 이미지로 영상 생성 진행\n');
-            if (isBase64Image(imageBase64OrUrl)) {
-                imageForVideo = stripBase64Prefix(imageBase64OrUrl);
-            } else {
-                imageForVideo = imageBase64OrUrl;
-            }
-        }
-
-        // ===== 2단계: Image-to-Video (무음 - 화질 우선) =====
-        const videoResult = await callImageToVideo(imageForVideo, productInfoForGeneration);
-
-        // ===== 3단계: ElevenLabs TTS 나레이션 생성 (2단계와 독립) =====
-        // 비디오 생성과 병렬로 실행할 수도 있지만, 순차 실행으로 안정성 확보
-        let audioDataUrl: string | undefined;
-        console.log(`\n[AI Service] ===== 3단계: ElevenLabs TTS 나레이션 생성 =====`);
-        try {
-            const ttsResult = await generateProductNarration(productInfoForGeneration, productInfo.narrationText);
-            if (ttsResult.success && ttsResult.audioBase64 && ttsResult.mimeType) {
-                audioDataUrl = audioToDataUrl(ttsResult.audioBase64, ttsResult.mimeType);
-                console.log(`[AI Service] 3단계 결과: TTS 생성 성공 (${Math.round(ttsResult.audioBase64.length / 1024)}KB)`);
-            } else {
-                console.warn(`[AI Service] 3단계 결과: TTS 생성 실패 (${ttsResult.error}) → 무음 영상으로 진행`);
-            }
-        } catch (ttsError) {
-            console.warn(`[AI Service] 3단계 TTS 오류 (무시하고 진행):`, ttsError);
-        }
-
-        // ===== 결과 저장 =====
-        if (videoResult.success && videoResult.videoUrl) {
-            await productStore.updateVideoStatus(productId, 'completed', videoResult.videoUrl, audioDataUrl, undefined, supabaseAdmin);
-            console.log(`\n${'='.repeat(60)}`);
-            console.log(`[AI Service] 영상+음성 생성 완료!`);
-            console.log(`[AI Service] 비디오 URL: ${videoResult.videoUrl.substring(0, 80)}...`);
-            console.log(`[AI Service] 나레이션: ${audioDataUrl ? '있음' : '없음 (무음)'}`);
-            console.log(`${'='.repeat(60)}\n`);
-        } else {
-            // 영상 실패해도 TTS 오디오가 있으면 함께 저장 (나중에 영상 재생성 시 활용)
-            const errorMsg = videoResult.error || '알 수 없는 오류';
-            // audioDataUrl은 실패해도 저장하지 않고, 실패 원인만 저장하도록 변경하거나, 오디오도 저장하고 싶다면 인자를 맞춰서 전달
-            // updateVideoStatus(id, status, videoUrl, audioUrl, errorReason)
-            await productStore.updateVideoStatus(productId, 'failed', undefined, audioDataUrl, errorMsg, supabaseAdmin);
-
-            const detailedMsg = `영상 생성 실패: ${errorMsg}${audioDataUrl ? ' (TTS 오디오는 저장됨)' : ''}`;
-            console.error(`\n[AI Service] ${detailedMsg}\n`);
-            throw new Error(detailedMsg);
-        }
     } catch (error) {
-        // 이미 updateVideoStatus가 호출되지 않은 경우에만 실패 처리
         const product = await productStore.getProduct(productId);
         if (product && product.videoStatus === 'generating') {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, supabaseAdmin);
+            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, undefined, undefined, supabaseAdmin);
         }
-        console.error(`[AI Service] 오류:`, error);
-        throw error; // 호출부에서 성공/실패 판단 가능
+        console.error(`[Veo Service] 트리거 오류:`, error);
+        throw error;
     }
 }
 
+// ============================================================================
 // 현재 설정된 서비스 정보
+// ============================================================================
 export function getAIServiceInfo(): { service: string; configured: boolean } {
-    return { service: 'kling', configured: true };
+    return { service: 'veo-3.1-fast', configured: !!GOOGLE_API_KEY };
 }

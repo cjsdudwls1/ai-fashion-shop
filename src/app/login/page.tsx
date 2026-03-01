@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import DaumPostcode from 'react-daum-postcode';
+import dynamic from 'next/dynamic';
+
+// P3-4: Daum 주소 컴포넌트 dynamic import — 초기 번들에서 제외하여 로딩 성능 개선
+const DaumPostcode = dynamic(() => import('react-daum-postcode'), {
+    loading: () => <div style={{ height: '450px', background: 'var(--bg-elevated)' }} className="animate-shimmer" />,
+    ssr: false,
+});
 
 // 이름을 내부 이메일 형식으로 변환 (Supabase Auth용)
 const nameToEmail = (inputName: string): string => {
@@ -33,7 +39,7 @@ const nameToEmail = (inputName: string): string => {
         }
         hex = `${h1.toString(36)}${h2.toString(36)}${name.length.toString(36)}`;
     }
-    return `${hex}@users.example.com`;
+    return `u_${hex}@aifashion-store.com`;
 };
 
 export default function LoginPage() {
@@ -99,10 +105,10 @@ export default function LoginPage() {
         setLoading(true);
         setMessage('');
 
-        // 이름/이메일 유효성 검사 (이메일 허용을 위해 @, . 추가 및 @._- 등 허용)
-        const nameRegex = /^[가-힣a-zA-Z0-9\s@._-]+$/;
+        // 이름 유효성 검사 (한글, 영대소문자, 숫자, 띄어쓰기만 허용)
+        const nameRegex = /^[가-힣a-zA-Z0-9\s]+$/;
         if (!nameRegex.test(name.trim())) {
-            setMessage('사용할 수 없는 특수문자가 포함되어 있습니다.');
+            setMessage('이름에는 한글, 영문, 숫자만 사용할 수 있습니다.');
             setLoading(false);
             return;
         }
@@ -145,6 +151,7 @@ export default function LoginPage() {
         });
 
         if (error) {
+            console.error('Signup error:', error);
             if (error.message.includes('already registered')) {
                 setMessage('이미 사용 중인 이름입니다. 다른 이름으로 가입해주세요.');
             } else if (error.message.includes('invalid') || error.message.includes('email')) {
@@ -157,20 +164,23 @@ export default function LoginPage() {
         }
 
         if (data.user) {
-            // profiles 테이블에 정보 저장
+            // 트리거가 profiles 행을 생성할 시간을 확보
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // profiles 테이블에 정보 저장 (upsert로 안전하게)
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({
+                .upsert({
+                    id: data.user.id,
                     username: name.trim(),
                     full_name: name.trim(),
                     phone_number: phone.trim(),
-                    address: fullAddress,
                     is_setup_finished: true,
-                })
-                .eq('id', data.user.id);
+                    updated_at: new Date().toISOString(),
+                });
 
             if (profileError) {
-                console.error('Profile update error:', profileError);
+                console.error('Profile upsert error:', profileError);
             }
 
             // addresses 테이블에도 기본 배송지 저장
@@ -199,7 +209,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-white">
+        <div className="flex min-h-screen w-full bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-gray-900 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] dark:shadow-none">
             {/* 왼쪽 브랜딩 섹션 (PC 버전) */}
             <div className="hidden lg:flex w-1/2 relative bg-[#0a0a0a] items-center justify-center overflow-hidden">
                 <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-purple-900/20 rounded-full blur-[120px] animate-pulse"></div>
@@ -222,38 +232,39 @@ export default function LoginPage() {
                 </div>
             </div>
 
-            {/* 오른쪽 로그인 폼 섹션 */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center px-8 sm:px-12 lg:px-24 py-12 bg-white relative overflow-y-auto">
+            {/* 오른쪽 로그인 폼 섹션 — P1-2: 모바일 최소 패딩 px-5 확보 */}
+            <div className="w-full lg:w-1/2 flex items-center justify-center px-5 sm:px-10 lg:px-24 py-12 bg-white dark:bg-[#121212] relative overflow-x-hidden overflow-y-auto">
 
-                {/* 홈으로 가기 */}
+                {/* 뒤로 가기 */}
                 <button
-                    onClick={() => router.push('/')}
-                    className="absolute top-8 right-8 p-3 text-gray-400 hover:text-black hover:bg-gray-50 rounded-full transition-all z-10"
+                    onClick={() => router.back()}
+                    aria-label="뒤로 가기"
+                    className="absolute top-8 left-8 p-3 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1A1A1A] rounded-full transition-all z-10"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </button>
 
-                <div className="w-full max-w-[520px] space-y-8">
+                <div className="w-full max-w-[520px]" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                     <div className="text-center lg:text-left">
-                        <h1 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">
+                        <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">
                             {isLogin ? '로그인' : '회원가입'}
                         </h1>
-                        <p className="text-gray-500 font-medium">
+                        <p className="text-gray-500 dark:text-gray-400 font-medium tracking-wide">
                             {isLogin ? 'AI 패션샵에 오신 것을 환영해요.' : '간단한 정보를 입력하고 시작하세요.'}
                         </p>
                     </div>
 
                     {/* 폼 */}
-                    <form className="space-y-5" onSubmit={isLogin ? handleLogin : handleSignup}>
-                        <div className="space-y-5">
+                    <form onSubmit={isLogin ? handleLogin : handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {/* 이름 */}
                             <div className="relative group">
-                                <label className="block text-sm font-bold text-gray-800 mb-2 ml-1">이름 또는 아이디</label>
+                                <label className="block text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-3 ml-1 tracking-wide">이름</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <svg className="h-5 w-5 text-gray-400 group-focus-within:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-5 w-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                         </svg>
                                     </div>
@@ -262,8 +273,8 @@ export default function LoginPage() {
                                         required
                                         autoComplete="name"
                                         style={{ paddingLeft: '52px' }}
-                                        className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 text-gray-900 text-base focus:border-black focus:ring-0 focus:bg-white transition-all outline-none"
-                                        placeholder="이름 또는 사용하실 아이디를 입력하세요"
+                                        className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1A1A1A] text-gray-900 dark:text-white text-base focus:border-black dark:focus:border-gray-500 focus:ring-0 focus:bg-white dark:focus:bg-[#222] transition-all outline-none"
+                                        placeholder="이름을 입력하세요"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                     />
@@ -272,10 +283,13 @@ export default function LoginPage() {
 
                             {/* 비밀번호 */}
                             <div className="relative group">
-                                <label className="block text-sm font-bold text-gray-800 mb-2 ml-1">비밀번호</label>
+                                <label className="block text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-3 ml-1 tracking-wide">
+                                    비밀번호
+                                    {!isLogin && <span className="text-xs font-normal text-blue-600 dark:text-blue-400 ml-2">* 최소 6자 이상 입력해주세요</span>}
+                                </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <svg className="h-5 w-5 text-gray-400 group-focus-within:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-5 w-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                         </svg>
                                     </div>
@@ -284,8 +298,8 @@ export default function LoginPage() {
                                         required
                                         minLength={6}
                                         autoComplete={isLogin ? "current-password" : "new-password"}
-                                        style={{ paddingLeft: '52px' }}
-                                        className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 text-gray-900 text-base focus:border-black focus:ring-0 focus:bg-white transition-all outline-none"
+                                        style={{ paddingLeft: '52px', paddingRight: '64px' }}
+                                        className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1A1A1A] text-gray-900 dark:text-white text-base focus:border-black dark:focus:border-gray-500 focus:ring-0 focus:bg-white dark:focus:bg-[#222] transition-all outline-none"
                                         placeholder={isLogin ? "비밀번호 입력" : "비밀번호 입력 (6자리 이상)"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
@@ -293,7 +307,7 @@ export default function LoginPage() {
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 hover:text-black text-sm"
+                                        className="password-toggle-btn absolute inset-y-0 right-0 px-3 text-sm font-medium text-gray-400 hover:text-black dark:hover:text-white transition-colors"
                                     >
                                         {showPassword ? '숨기기' : '보기'}
                                     </button>
@@ -306,10 +320,10 @@ export default function LoginPage() {
 
                                     {/* 전화번호 */}
                                     <div className="relative group animate-fade-in-down">
-                                        <label className="block text-sm font-bold text-gray-800 mb-2 ml-1">전화번호</label>
+                                        <label className="block text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-3 ml-1 tracking-wide">전화번호</label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="h-5 w-5 text-gray-400 dark:group-focus-within:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498" />
                                                 </svg>
                                             </div>
@@ -317,7 +331,7 @@ export default function LoginPage() {
                                                 type="tel"
                                                 required
                                                 style={{ paddingLeft: '52px' }}
-                                                className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 text-gray-900 text-base focus:border-black focus:ring-0 focus:bg-white transition-all outline-none"
+                                                className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1A1A1A] text-gray-900 dark:text-white text-base focus:border-black dark:focus:border-gray-500 focus:ring-0 focus:bg-white dark:focus:bg-[#222] transition-all outline-none"
                                                 placeholder="010-0000-0000"
                                                 value={phone}
                                                 onChange={(e) => setPhone(e.target.value)}
@@ -327,7 +341,7 @@ export default function LoginPage() {
 
                                     {/* 주소 - Daum Postcode API */}
                                     <div className="relative group animate-fade-in-down">
-                                        <label className="block text-sm font-bold text-gray-800 mb-2 ml-1">주소</label>
+                                        <label className="block text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-3 ml-1 tracking-wide">주소</label>
                                         <div className="flex gap-2">
                                             <div className="relative flex-1">
                                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -341,7 +355,7 @@ export default function LoginPage() {
                                                     readOnly
                                                     required
                                                     style={{ paddingLeft: '52px' }}
-                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 text-gray-900 text-base cursor-pointer outline-none"
+                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1A1A1A] text-gray-900 dark:text-white text-base cursor-pointer outline-none"
                                                     placeholder="우편번호"
                                                     value={zonecode}
                                                     onClick={() => setOpenPostcode(true)}
@@ -362,7 +376,7 @@ export default function LoginPage() {
                                                 <input
                                                     type="text"
                                                     readOnly
-                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-100 text-gray-700 text-base px-5 outline-none"
+                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-[#222] text-gray-700 dark:text-gray-300 text-base px-5 outline-none"
                                                     value={roadAddress}
                                                 />
                                             </div>
@@ -374,7 +388,7 @@ export default function LoginPage() {
                                                 <input
                                                     type="text"
                                                     style={{ paddingLeft: '52px' }}
-                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 text-gray-900 text-base focus:border-black focus:ring-0 focus:bg-white transition-all outline-none"
+                                                    className="block w-full h-14 rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1A1A1A] text-gray-900 dark:text-white text-base focus:border-black dark:focus:border-gray-500 focus:ring-0 focus:bg-white dark:focus:bg-[#222] transition-all outline-none"
                                                     placeholder="상세주소 입력 (동/호수 등)"
                                                     value={detailAddress}
                                                     onChange={(e) => setDetailAddress(e.target.value)}
@@ -390,23 +404,36 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-14 rounded-2xl bg-black text-white text-lg font-bold hover:bg-gray-800 transition-all shadow-xl hover:scale-[1.01] disabled:opacity-50 mt-4"
+                            className="w-full h-14 rounded-2xl bg-black dark:bg-white text-white dark:text-black text-[17px] font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition-all shadow-xl hover:scale-[1.01] disabled:opacity-50 mt-6"
                         >
                             {loading ? '처리 중...' : (isLogin ? '로그인하기' : '가입 완료하기')}
                         </button>
                     </form>
 
                     {/* 하단 링크 */}
-                    <div className="flex flex-col items-center gap-6">
+                    <div className="flex flex-col items-center gap-4 mt-6">
                         <div className="flex items-center gap-3">
-                            <span className="text-gray-400 text-sm">{isLogin ? '아직 회원이 아니신가요?' : '이미 계정이 있으신가요?'}</span>
+                            <span className="text-gray-600 dark:text-gray-400 text-sm tracking-wide">{isLogin ? '아직 회원이 아니신가요?' : '이미 계정이 있으신가요?'}</span>
                             <button
+                                type="button"
                                 onClick={() => { setIsLogin(!isLogin); setMessage(''); }}
-                                className="text-black font-bold text-sm hover:underline underline-offset-4"
+                                className="font-bold text-sm underline underline-offset-4 text-purple-500 hover:text-pink-500 transition-colors"
                             >
                                 {isLogin ? '회원가입 하기' : '로그인 하기'}
                             </button>
                         </div>
+
+                        {isLogin && (
+                            <div className="mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/login/find')}
+                                    className="text-gray-500 dark:text-gray-400 font-medium text-sm hover:text-black dark:hover:text-white transition-colors underline-offset-4 hover:underline"
+                                >
+                                    아이디 / 비밀번호 찾기
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* 메시지 */}

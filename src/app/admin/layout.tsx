@@ -1,65 +1,33 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getCurrentUser, isAdminUser } from '@/lib/authUtils';
+import AdminVideoSyncer from './AdminVideoSyncer';
+import AdminSidebar from './AdminSidebar';
 
 export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const cookieStore = await cookies();
+    // 이중 방어: 미들웨어(1차) + 레이아웃(2차)
+    const user = await getCurrentUser();
 
-    // Create Supabase client for server component
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll();
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        );
-                    } catch {
-                        // The `setAll` method was called from a Server Component.
-                        // This can be ignored if you have middleware refreshing
-                        // user sessions.
-                    }
-                },
-            },
-        }
-    );
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    // [개발용] 관리자 페이지 접근 제한 해제
-    /*
-    // Check if user is logged in
     if (!user) {
         redirect('/login?next=/admin');
     }
 
-    // Check Admin Role
-    const isAdmin =
-        user.email === 'admin@fashion.local' ||
-        user.user_metadata?.is_admin === true ||
-        user.user_metadata?.role === 'admin' ||
-        user.app_metadata?.role === 'admin';
-
-    if (!isAdmin) {
+    if (!(await isAdminUser(user))) {
         redirect('/');
     }
-    */
 
     return (
-        <div className="admin-layout">
-            {/* Optional: Add Admin Sidebar here */}
-            {children}
+        <div className="flex bg-[var(--bg-main)] min-h-screen" style={{ fontSize: '18px' }}>
+            <AdminSidebar />
+            <div className="flex-1 overflow-x-hidden pt-16" style={{ marginLeft: '280px', marginTop: '-64px' }}>
+                <div className="mt-[64px] min-h-[calc(100vh-64px)] overflow-y-auto w-full">
+                    <AdminVideoSyncer />
+                    {children}
+                </div>
+            </div>
         </div>
     );
 }

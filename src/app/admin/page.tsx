@@ -1,39 +1,13 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent, useEffect } from 'react';
+import { useState, useRef, useMemo, ChangeEvent, FormEvent, DragEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'react-hot-toast';
-import { getNarrationOptions } from '@/lib/narrationUtils';
+
 import imageCompression from 'browser-image-compression';
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase Client (For Storage Upload)
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key-for-build'
-);
-
-// 사전 정의된 색상 목록
-const COMMON_COLORS = [
-    { name: '블랙', hex: '#000000', text: '#fff' },
-    { name: '화이트', hex: '#ffffff', text: '#000', border: true },
-    { name: '네이비', hex: '#1a237e', text: '#fff' },
-    { name: '차콜', hex: '#37474f', text: '#fff' },
-    { name: '그레이', hex: '#9e9e9e', text: '#000' },
-    { name: '베이지', hex: '#f5f5dc', text: '#000', border: true },
-    { name: '아이보리', hex: '#fffff0', text: '#000', border: true },
-    { name: '브라운', hex: '#795548', text: '#fff' },
-    { name: '레드', hex: '#d32f2f', text: '#fff' },
-    { name: '블루', hex: '#2196f3', text: '#fff' },
-    { name: '그린', hex: '#4caf50', text: '#fff' },
-    { name: '옐로우', hex: '#ffeb3b', text: '#000' },
-    { name: '핑크', hex: '#f48fb1', text: '#fff' },
-    { name: '퍼플', hex: '#9c27b0', text: '#fff' },
-];
-
-// 사전 정의된 사이즈 목록
-const COMMON_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'FREE'];
+import { uploadImageToCloudinary } from '@/lib/clientCloudinaryUtils';
+import { CATEGORY_MAP, COMMON_COLORS, COMMON_SIZES } from '@/lib/constants';
 
 interface StockItem {
     id: number;
@@ -74,51 +48,29 @@ export default function AdminPage() {
     const [isDragOver, setIsDragOver] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // 나레이션 관리 상태
-    const [narrationOptions, setNarrationOptions] = useState<string[]>([]);
-    const [selectedNarration, setSelectedNarration] = useState<string>('');
-    const [customNarration, setCustomNarration] = useState<string>('');
-    const [isCustomNarration, setIsCustomNarration] = useState(false);
+    // 미디어 생성 옵션 (기본: 동영상 생성)
+    const [mediaGenerationType, setMediaGenerationType] = useState<'video' | 'image' | 'none'>('video');
 
-    // 저장된 스크립트 관리
-    const [savedScripts, setSavedScripts] = useState<string[]>([]);
+    // AI 영상 생성 모델 선택
+    const [videoModel, setVideoModel] = useState<'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview'>('veo-3.1-fast-generate-preview');
 
-    useEffect(() => {
-        const saved = localStorage.getItem('savedNarrationScripts');
-        if (saved) {
-            try {
-                setSavedScripts(JSON.parse(saved));
-            } catch (e) {
-                console.error('Failed to parse saved scripts', e);
-            }
-        }
-    }, []);
+    // 모델 나레이션 대사 선택 (추천 3개 + 직접 입력)
+    const [narrationOption, setNarrationOption] = useState<'auto1' | 'auto2' | 'auto3' | 'custom'>('auto1');
+    const [customNarration, setCustomNarration] = useState('');
 
-    const handleSaveScript = () => {
-        if (!customNarration.trim()) return;
-        // 중복 체크
-        if (savedScripts.includes(customNarration.trim())) {
-            alert('이미 저장된 스크립트입니다.');
-            return;
-        }
+    // 상품 정보에 따라 추천 대사 동적 생성
+    const narrationOptions = useMemo(() => {
+        const name = formData.name || '상품명';
+        const fabric = formData.fabric || '프리미엄 소재';
+        const catKr = CATEGORY_MAP[formData.category] || '패션 아이템';
+        return [
+            `${name}. ${fabric} 소재로 완성한 프리미엄 ${catKr}, 지금 만나보세요.`,
+            `이번 시즌 가장 핫한 ${name}! ${fabric}의 편안한 착용감을 경험해보세요.`,
+            `${fabric} 소재의 ${name}, 스타일과 실용성을 동시에 갖춘 ${catKr}입니다.`,
+        ];
+    }, [formData.name, formData.fabric, formData.category]);
 
-        const newScripts = [...savedScripts, customNarration.trim()];
-        setSavedScripts(newScripts);
-        localStorage.setItem('savedNarrationScripts', JSON.stringify(newScripts));
-        alert('스크립트가 저장되었습니다.');
-    };
 
-    const handleDeleteScript = (index: number) => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
-        const newScripts = savedScripts.filter((_, i) => i !== index);
-        setSavedScripts(newScripts);
-        localStorage.setItem('savedNarrationScripts', JSON.stringify(newScripts));
-    };
-
-    const handleApplyScript = (script: string) => {
-        setCustomNarration(script);
-        // alert('스크립트가 적용되었습니다.'); // 너무 자주 뜨면 귀찮으므로 주석
-    };
 
     // 이미지 압축 및 처리
     const handleImageFiles = async (files: FileList | null) => {
@@ -193,40 +145,7 @@ export default function AdminPage() {
         })));
     };
 
-    // 나레이션 옵션 자동 생성
-    useEffect(() => {
-        // 이름과 소재가 없어도 예시를 보여주기 위해 기본값 사용
-        const nameData = formData.name.trim() || '상품명';
-        const fabricData = formData.fabric.trim() || '소재';
 
-        const options = getNarrationOptions({
-            name: nameData,
-            fabric: fabricData,
-            gender: formData.gender,
-            category: formData.category
-        });
-        setNarrationOptions(options);
-
-        // 현재 선택된 나레이션이 변경된 옵션 목록에 없고, 커스텀 모드도 아니라면 첫 번째 옵션을 자동 선택
-        // 단, 사용자가 명시적으로 선택한 것이 사라지는 것을 방지하기 위해 로직 주의
-        if (!isCustomNarration) {
-            // 이미 선택된 값이 있고, 그것이 새 옵션 목록에 포함되어 있다면 유지
-            if (selectedNarration && options.includes(selectedNarration)) {
-                return;
-            }
-            // 그 외의 경우 (처음 진입, 데이터 변경으로 옵션 내용이 바뀐 경우) 첫 번째 옵션 선택
-            setSelectedNarration(options[0]);
-        }
-    }, [formData.name, formData.fabric, formData.price, formData.gender, formData.category, isCustomNarration]); // selectedNarration 의존성 제거 (무한 루프 방지)
-
-    const handleNarrationChange = (value: string) => {
-        if (value === 'custom') {
-            setIsCustomNarration(true);
-        } else {
-            setIsCustomNarration(false);
-            setSelectedNarration(value);
-        }
-    };
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         handleImageFiles(e.target.files);
@@ -253,7 +172,6 @@ export default function AdminPage() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // 재고 추가 핸들러
     // 재고 추가 핸들러
     const handleAddStock = () => {
         if (!selectedColor) return;
@@ -291,26 +209,7 @@ export default function AdminPage() {
         setStockList(stockList.filter(item => item.id !== id));
     };
 
-    // Storage 업로드 함수
-    const uploadImageToStorage = async (file: File): Promise<string> => {
-        const fileExt = 'webp'; // We convert to webp
-        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `${fileName}`; // bucket root
-
-        const { error: uploadError } = await supabase.storage
-            .from('products')
-            .upload(filePath, file);
-
-        if (uploadError) {
-            throw uploadError;
-        }
-
-        const { data } = supabase.storage
-            .from('products')
-            .getPublicUrl(filePath);
-
-        return data.publicUrl;
-    };
+    // Cloudinary 업로드는 src/lib/clientCloudinaryUtils.ts 의 uploadImageToCloudinary 사용
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -333,7 +232,7 @@ export default function AdminPage() {
             // 1. 이미지 업로드 (병렬 처리)
             const uploadPromises = images.map(async (img) => {
                 if (img.file) {
-                    const publicUrl = await uploadImageToStorage(img.file);
+                    const publicUrl = await uploadImageToCloudinary(img.file);
                     return { ...img, url: publicUrl };
                 }
                 return img; // 이미 URL이 있는 경우 (수정 시 등 - 현재는 신규만 고려)
@@ -383,9 +282,14 @@ export default function AdminPage() {
                     fabric: formData.fabric,
                     gender: formData.gender,
                     category: formData.category,
-                    narrationText: isCustomNarration ? customNarration : selectedNarration,
+
                     colorsText,
                     sizesText,
+                    mediaGenerationType,
+                    videoModel: mediaGenerationType === 'video' ? videoModel : undefined, // 여기서 값 전달
+                    narrationText: narrationOption === 'custom'
+                        ? (customNarration.trim() || undefined)
+                        : narrationOptions[parseInt(narrationOption.replace('auto', '')) - 1],
                 }),
             });
 
@@ -413,21 +317,18 @@ export default function AdminPage() {
 
                 {/* Top Action Bar (Shopify Style) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                    <h1 className="text-2xl font-bold flex items-center gap-4">
-                        <button onClick={() => router.back()} style={{ border: '1px solid var(--border-color)', padding: '8px', borderRadius: '8px', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="hover:bg-gray-50 transition-colors">
+                    <h1 className="text-3xl font-bold flex items-center gap-4 text-[var(--text-primary)]">
+                        <button onClick={() => router.back()} style={{ border: '1px solid var(--border-color)', padding: '8px', borderRadius: '8px', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="hover:bg-[var(--bg-elevated)] transition-colors">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
                         </button>
                         상품 등록
                     </h1>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        {/* Buttons removed from here */}
-                    </div>
                 </div>
 
                 {error && (
                     <div style={{
                         padding: '16px', marginBottom: '32px', borderRadius: '12px',
-                        border: '1px solid #ef4444', backgroundColor: '#fef2f2', color: '#991b1b', fontSize: '14px',
+                        border: '1px solid #ef4444', backgroundColor: '#fef2f2', color: '#991b1b', fontSize: '18px',
                         display: 'flex', alignItems: 'center', gap: '12px'
                     }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
@@ -475,10 +376,10 @@ export default function AdminPage() {
                                     }}>
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-secondary)' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                                     </div>
-                                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                    <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                                         {images.length > 0 ? '이미지 추가하기' : '이미지 업로드'}
                                     </p>
-                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>드래그 앤 드롭 또는 클릭하여 선택 (다중 선택 가능)</p>
+                                    <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>드래그 앤 드롭 또는 클릭하여 선택 (다중 선택 가능)</p>
                                 </div>
                             </div>
                             <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
@@ -514,9 +415,9 @@ export default function AdminPage() {
                                                 {img.isMain && (
                                                     <div style={{
                                                         position: 'absolute', top: '8px', left: '8px',
-                                                        padding: '4px 8px', borderRadius: '4px',
+                                                        padding: '5px 10px', borderRadius: '4px',
                                                         background: 'var(--primary-color)', color: '#fff',
-                                                        fontSize: '10px', fontWeight: 700
+                                                        fontSize: '13px', fontWeight: 700
                                                     }}>
                                                         대표
                                                     </div>
@@ -534,7 +435,7 @@ export default function AdminPage() {
                                                         onChange={() => handleSetMainImage(img.id)}
                                                         style={{ accentColor: 'var(--primary-color)' }}
                                                     />
-                                                    <span style={{ fontSize: '12px', fontWeight: 500 }}>대표 이미지 설정</span>
+                                                    <span style={{ fontSize: '16px', fontWeight: 500 }}>대표 이미지 설정</span>
                                                 </label>
 
                                                 {/* Set Color Select Removed */}
@@ -548,7 +449,7 @@ export default function AdminPage() {
                         {/* Card 1: Basic Info */}
                         <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                             <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>상품명 (Title)</label>
+                                <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>상품명 (Title)</label>
                                 <input
                                     type="text" name="name" value={formData.name} onChange={handleInputChange}
                                     placeholder="예: 미니멀 울 코트"
@@ -561,7 +462,7 @@ export default function AdminPage() {
                             </div>
 
                             <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>가격 (Price)</label>
+                                <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>가격 (Price)</label>
                                 <input
                                     type="text"
                                     name="price"
@@ -582,7 +483,7 @@ export default function AdminPage() {
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>소재 (Material / Fabric)</label>
+                                <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>소재 (Material / Fabric)</label>
                                 <input
                                     type="text" name="fabric" value={formData.fabric} onChange={handleInputChange}
                                     placeholder="예: 캐시미어 100%"
@@ -596,14 +497,14 @@ export default function AdminPage() {
 
                             {/* Gender Selection */}
                             <div style={{ marginTop: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>성별 (Gender)</label>
+                                <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>성별 (Gender)</label>
                                 <div style={{ display: 'flex', gap: '16px' }}>
                                     {[
                                         { value: 'female', label: '여성 (Female)' },
                                         { value: 'male', label: '남성 (Male)' },
                                         { value: 'unisex', label: '남녀공용 (Unisex)' }
                                     ].map((option) => (
-                                        <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                                        <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '18px', cursor: 'pointer', color: 'var(--text-primary)' }}>
                                             <input
                                                 type="radio"
                                                 name="gender"
@@ -620,7 +521,7 @@ export default function AdminPage() {
 
                             {/* Category Selection */}
                             <div style={{ marginTop: '24px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>카테고리 (Category)</label>
+                                <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>카테고리 (Category)</label>
                                 <select
                                     name="category"
                                     value={formData.category}
@@ -628,7 +529,7 @@ export default function AdminPage() {
                                     style={{
                                         width: '100%', padding: '12px', borderRadius: '8px',
                                         border: '1px solid var(--border-color)',
-                                        background: 'var(--bg-elevated)', fontSize: '14px',
+                                        background: 'var(--bg-elevated)', fontSize: '18px',
                                         color: 'var(--text-primary)', cursor: 'pointer'
                                     }}
                                 >
@@ -666,134 +567,192 @@ export default function AdminPage() {
                         </div>
 
 
-                        {/* Card: Narration Script (Moved) */}
+                        {/* Card: Media Generation Option */}
                         <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI 나레이션 스크립트 (Narration Script)</h3>
+                            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>미디어 생성 옵션 (Media Generation)</h3>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {narrationOptions.map((option, idx) => (
+                                {[
+                                    { value: 'video' as const, label: 'AI 동영상 생성', desc: '상품 이미지를 기반으로 AI 가상 피팅 + 패션 동영상 + 나레이션을 자동 생성합니다.', icon: '🎬' },
+                                    { value: 'image' as const, label: 'AI 이미지 생성', desc: 'AI 가상 피팅(Try-On) 이미지만 생성합니다. 동영상은 생성하지 않습니다.', icon: '🖼️' },
+                                    { value: 'none' as const, label: '미디어 생성 안 함', desc: 'AI 미디어를 생성하지 않고 상품만 등록합니다.', icon: '⏭️' },
+                                ].map((option) => (
                                     <label
-                                        key={idx}
+                                        key={option.value}
                                         style={{
                                             display: 'flex', alignItems: 'flex-start', gap: '12px',
-                                            cursor: 'pointer', padding: '12px',
+                                            cursor: 'pointer', padding: '16px',
                                             borderRadius: '8px',
-                                            border: (!isCustomNarration && selectedNarration === option) ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
-                                            background: (!isCustomNarration && selectedNarration === option) ? 'var(--bg-elevated)' : 'transparent',
+                                            border: mediaGenerationType === option.value ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                            background: mediaGenerationType === option.value ? 'var(--bg-elevated)' : 'transparent',
                                             transition: 'all 0.2s'
                                         }}
-                                        onClick={() => {
-                                            setIsCustomNarration(false);
-                                            setSelectedNarration(option);
+                                        onClick={() => setMediaGenerationType(option.value)}
+                                    >
+                                        <div style={{
+                                            width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                                            border: mediaGenerationType === option.value ? '5px solid var(--primary-color)' : '1px solid var(--text-secondary)',
+                                            background: 'transparent'
+                                        }} />
+                                        <div>
+                                            <span style={{ fontSize: '18px', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-primary)' }}>
+                                                {option.icon} {option.label}
+                                            </span>
+                                            <span style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                                                {option.desc}
+                                            </span>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Card: Video Model Selection (동영상 생성 선택 시에만 표시) */}
+                        {mediaGenerationType === 'video' && (
+                            <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
+                                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI 영상 생성 모델 (Video Model)</h3>
+                                <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+                                    영상을 생성할 AI 모델을 선택하세요.
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {[
+                                        { value: 'veo-3.1-fast-generate-preview' as const, label: '빠른 생성 모델 (Fast)', desc: '720p 해상도로 빠르게 영상을 생성합니다. (Veo 3.1 Fast)' },
+                                        { value: 'veo-3.1-generate-preview' as const, label: '고품질 모델 (High Quality)', desc: '더욱 뛰어난 품질의 영상을 생성합니다. 생성 시간이 다소 길 수 있습니다. (Veo 3.1 최신 모델)' },
+                                    ].map((option) => (
+                                        <label
+                                            key={option.value}
+                                            style={{
+                                                display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                                cursor: 'pointer', padding: '16px',
+                                                borderRadius: '8px',
+                                                border: videoModel === option.value ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                                background: videoModel === option.value ? 'var(--bg-elevated)' : 'transparent',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onClick={() => setVideoModel(option.value)}
+                                        >
+                                            <div style={{
+                                                width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                                                border: videoModel === option.value ? '5px solid var(--primary-color)' : '1px solid var(--text-secondary)',
+                                                background: 'transparent'
+                                            }} />
+                                            <div>
+                                                <span style={{ fontSize: '16px', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-primary)' }}>
+                                                    {option.label}
+                                                </span>
+                                                <span style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                                                    {option.desc}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Card: Narration Selection (동영상 생성 선택 시에만 표시) */}
+                        {mediaGenerationType === 'video' && (
+                            <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>모델 대사 (Narration)</h3>
+                                <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+                                    AI 영상에서 모델이 읊을 대사를 선택하세요. 상품 정보에 맞춰 추천됩니다.
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {/* 추천 대사 3개 */}
+                                    {narrationOptions.map((text, idx) => {
+                                        const optionKey = `auto${idx + 1}` as 'auto1' | 'auto2' | 'auto3';
+                                        const labels = ['프리미엄 감성', '트렌디 캐주얼', '실용성 강조'];
+                                        const isSelected = narrationOption === optionKey;
+                                        return (
+                                            <label
+                                                key={optionKey}
+                                                onClick={() => setNarrationOption(optionKey)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                                    cursor: 'pointer', padding: '14px 16px',
+                                                    borderRadius: '10px',
+                                                    border: isSelected ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                                    background: isSelected ? 'var(--bg-elevated)' : 'transparent',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                                                    border: isSelected ? '5px solid var(--primary-color)' : '1px solid var(--text-secondary)',
+                                                    background: 'transparent'
+                                                }} />
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '4px', display: 'block' }}>
+                                                        {labels[idx]}
+                                                    </span>
+                                                    <span style={{ fontSize: '16px', color: 'var(--text-primary)', lineHeight: '1.5', display: 'block' }}>
+                                                        "{text}"
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
+
+                                    {/* 직접 입력 옵션 */}
+                                    <label
+                                        onClick={() => setNarrationOption('custom')}
+                                        style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                            cursor: 'pointer', padding: '14px 16px',
+                                            borderRadius: '10px',
+                                            border: narrationOption === 'custom' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                            background: narrationOption === 'custom' ? 'var(--bg-elevated)' : 'transparent',
+                                            transition: 'all 0.2s'
                                         }}
                                     >
                                         <div style={{
                                             width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
-                                            border: (!isCustomNarration && selectedNarration === option) ? '5px solid var(--text-primary)' : '1px solid var(--text-secondary)',
+                                            border: narrationOption === 'custom' ? '5px solid var(--primary-color)' : '1px solid var(--text-secondary)',
                                             background: 'transparent'
                                         }} />
-                                        <span style={{ fontSize: '14px', lineHeight: '1.5', color: 'var(--text-primary)' }}>{option}</span>
+                                        <div style={{ flex: 1 }}>
+                                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '4px', display: 'block' }}>
+                                                직접 입력
+                                            </span>
+                                            <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>
+                                                원하는 대사를 직접 작성합니다
+                                            </span>
+                                        </div>
                                     </label>
-                                ))}
 
-                                {/* Custom Input Option */}
-                                <label
-                                    style={{
-                                        display: 'flex', alignItems: 'flex-start', gap: '12px',
-                                        cursor: 'pointer', padding: '12px',
-                                        borderRadius: '8px',
-                                        border: isCustomNarration ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
-                                        background: isCustomNarration ? 'var(--bg-elevated)' : 'transparent',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onClick={() => setIsCustomNarration(true)}
-                                >
-                                    <div style={{
-                                        width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
-                                        border: isCustomNarration ? '5px solid var(--text-primary)' : '1px solid var(--text-secondary)',
-                                        background: 'transparent'
-                                    }} />
-                                    <div style={{ flex: 1 }}>
-                                        <span style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>직접 입력 (Custom)</span>
-                                        {isCustomNarration && (
-                                            <div style={{ marginTop: '8px' }}>
-                                                <textarea
-                                                    value={customNarration}
-                                                    onChange={(e) => setCustomNarration(e.target.value)}
-                                                    placeholder="원하는 나레이션 문구를 직접 입력하세요..."
-                                                    style={{
-                                                        width: '100%', padding: '10px',
-                                                        borderRadius: '6px', border: '1px solid var(--border-color)',
-                                                        background: 'var(--bg-card)', fontSize: '14px', lineHeight: '1.5',
-                                                        minHeight: '80px', resize: 'vertical'
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()} // Prevent validation triggering
-                                                />
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); handleSaveScript(); }}
-                                                        style={{
-                                                            fontSize: '12px', padding: '6px 12px', borderRadius: '6px',
-                                                            background: 'var(--bg-elevated)', border: '1px solid var(--border-color)',
-                                                            cursor: 'pointer', color: 'var(--text-primary)'
-                                                        }}
-                                                    >
-                                                        현재 스크립트 저장 (Save)
-                                                    </button>
-                                                </div>
-
-                                                {/* Saved Scripts List */}
-                                                {savedScripts.length > 0 && (
-                                                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                                                        <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>저장된 스크립트 (Saved Presets)</p>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                            {savedScripts.map((script, idx) => (
-                                                                <div key={idx} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                                    padding: '8px', background: 'var(--bg-elevated)', borderRadius: '6px',
-                                                                    border: '1px solid var(--border-color)'
-                                                                }}>
-                                                                    <div
-                                                                        style={{ flex: 1, fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', marginRight: '8px' }}
-                                                                        onClick={(e) => { e.stopPropagation(); handleApplyScript(script); }}
-                                                                        title={script}
-                                                                    >
-                                                                        {script}
-                                                                    </div>
-                                                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => { e.stopPropagation(); handleApplyScript(script); }}
-                                                                            style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: 'var(--primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
-                                                                        >
-                                                                            적용
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteScript(idx); }}
-                                                                            style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
-                                                                        >
-                                                                            삭제
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                    {/* 직접 입력 텍스트 영역 */}
+                                    {narrationOption === 'custom' && (
+                                        <div style={{ marginLeft: '30px', marginTop: '4px' }}>
+                                            <textarea
+                                                value={customNarration}
+                                                onChange={(e) => setCustomNarration(e.target.value)}
+                                                placeholder='예: "이번 시즌 가장 핫한 블루셔츠! 편안한 착용감과 세련된 디자인을 동시에 만나보세요."'
+                                                rows={3}
+                                                autoFocus
+                                                style={{
+                                                    width: '100%', padding: '12px', borderRadius: '8px',
+                                                    border: '1px solid var(--border-color)',
+                                                    background: 'var(--bg-card)', fontSize: '16px',
+                                                    color: 'var(--text-primary)', resize: 'vertical',
+                                                    fontFamily: 'inherit', lineHeight: '1.6'
+                                                }}
+                                            />
+                                            <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                                {customNarration.length > 0 ? `${customNarration.length}자 입력됨` : '대사를 입력해주세요'}
                                             </div>
-                                        )}
-                                    </div>
-                                </label>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Card 3: Variants */}
                         <div className="glass-card" style={{ padding: '0px', overflow: 'hidden', borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600 }}>재고 (Stock)</h3>
-                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{stockList.length}개 옵션 추가됨</span>
+                                <h3 style={{ fontSize: '18px', fontWeight: 600 }}>재고 (Stock)</h3>
+                                <span style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>{stockList.length}개 옵션 추가됨</span>
                             </div>
 
                             <div style={{ padding: '24px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
@@ -801,7 +760,7 @@ export default function AdminPage() {
 
                                     {/* Option 1: Color */}
                                     <div>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, marginBottom: '12px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>옵션 1: 색상 (Color)</label>
+                                        <label style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>옵션 1: 색상 (Color)</label>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                             {COMMON_COLORS.map(c => (
                                                 <button
@@ -817,7 +776,7 @@ export default function AdminPage() {
                                                     }}
                                                 >
                                                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.hex, border: '1px solid rgba(0,0,0,0.1)' }} />
-                                                    <span style={{ fontSize: '13px', fontWeight: selectedColor === c.name ? 600 : 400 }}>{c.name}</span>
+                                                    <span style={{ fontSize: '16px', fontWeight: selectedColor === c.name ? 600 : 400 }}>{c.name}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -825,7 +784,7 @@ export default function AdminPage() {
 
                                     {/* Option 2: Size */}
                                     <div>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, marginBottom: '12px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>옵션 2: 사이즈 (Size)</label>
+                                        <label style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>옵션 2: 사이즈 (Size)</label>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                             {COMMON_SIZES.map(s => (
                                                 <button
@@ -833,7 +792,7 @@ export default function AdminPage() {
                                                     type="button"
                                                     onClick={() => setSelectedSize(s)}
                                                     style={{
-                                                        padding: '8px 16px', fontSize: '13px', fontWeight: selectedSize === s ? 600 : 400,
+                                                        padding: '8px 16px', fontSize: '16px', fontWeight: selectedSize === s ? 600 : 400,
                                                         background: selectedSize === s ? 'var(--text-primary)' : 'transparent',
                                                         color: selectedSize === s ? 'var(--bg-card)' : 'var(--text-primary)',
                                                         border: selectedSize === s ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
@@ -849,7 +808,7 @@ export default function AdminPage() {
                                     {/* Option 3: Quantity & Add */}
                                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginTop: '8px' }}>
                                         <div style={{ width: '120px' }}>
-                                            <label style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>수량 (Quantity)</label>
+                                            <label style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>수량 (Quantity)</label>
                                             <input
                                                 type="number" min="1" value={quantity}
                                                 onChange={(e) => {
@@ -859,7 +818,7 @@ export default function AdminPage() {
                                                 }}
                                                 style={{
                                                     width: '100%', padding: '10px', border: '1px solid var(--border-color)',
-                                                    borderRadius: '8px', background: 'var(--bg-card)', fontSize: '14px'
+                                                    borderRadius: '8px', background: 'var(--bg-card)', fontSize: '18px'
                                                 }}
                                             />
                                         </div>
@@ -869,7 +828,7 @@ export default function AdminPage() {
                                             disabled={!selectedColor || !selectedSize}
                                             className="btn-primary"
                                             style={{
-                                                padding: '10px 24px', fontSize: '14px', height: '42px', borderRadius: '8px',
+                                                padding: '12px 24px', fontSize: '18px', height: '46px', borderRadius: '8px',
                                                 opacity: (!selectedColor || !selectedSize) ? 0.5 : 1
                                             }}
                                         >
@@ -882,12 +841,12 @@ export default function AdminPage() {
 
                             {/* Resource List Table */}
                             <div style={{ width: '100%' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '18px' }}>
                                     <thead style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
                                         <tr>
-                                            <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 600, fontSize: '12px', color: 'var(--text-secondary)' }}>옵션명</th>
-                                            <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 600, fontSize: '12px', color: 'var(--text-secondary)' }}>재고 수량</th>
-                                            <th style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 600, fontSize: '12px', color: 'var(--text-secondary)' }}>관리</th>
+                                            <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 600, fontSize: '16px', color: 'var(--text-secondary)' }}>옵션명</th>
+                                            <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 600, fontSize: '16px', color: 'var(--text-secondary)' }}>재고 수량</th>
+                                            <th style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 600, fontSize: '16px', color: 'var(--text-secondary)' }}>관리</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -912,7 +871,7 @@ export default function AdminPage() {
                                                             onClick={() => handleRemoveStock(item.id)}
                                                             style={{
                                                                 color: '#ef4444', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)',
-                                                                cursor: 'pointer', fontSize: '12px', padding: '6px 12px', borderRadius: '6px'
+                                                                cursor: 'pointer', fontSize: '16px', padding: '8px 14px', borderRadius: '6px'
                                                             }}
                                                             className="hover:bg-red-50 hover:border-red-500 transition-all"
                                                         >
@@ -943,7 +902,7 @@ export default function AdminPage() {
                                 border: '1px solid var(--border-color)',
                                 background: 'var(--bg-card)',
                                 borderRadius: '8px',
-                                fontSize: '14px',
+                                fontSize: '18px',
                                 fontWeight: 500,
                                 cursor: 'pointer'
                             }}
@@ -957,7 +916,7 @@ export default function AdminPage() {
                             className="btn-primary"
                             style={{
                                 padding: '10px 24px',
-                                fontSize: '14px',
+                                fontSize: '18px',
                                 borderRadius: '8px',
                                 minWidth: '100px',
                                 background: '#1a1a1a',

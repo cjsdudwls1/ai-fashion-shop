@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
@@ -31,51 +31,49 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    let user = null
+    try {
+        const { data, error } = await supabase.auth.getUser()
+        if (error) {
+            // Invalid Refresh Token 등 인증 오류 시 세션 삭제 후 비로그인 처리
+            if (
+                error.message?.includes('Refresh Token Not Found') ||
+                error.message?.includes('Invalid Refresh Token') ||
+                error.status === 400 ||
+                error.status === 401
+            ) {
+                await supabase.auth.signOut()
+                const url = request.nextUrl.clone()
+                url.pathname = '/login'
+                response = NextResponse.redirect(url)
+                return response
+            }
+        } else {
+            user = data.user
+        }
+    } catch {
+        // 네트워크 오류 등 예외 발생 시 비로그인 상태로 처리
+    }
 
-    // 1. Admin Authorization Protection
-    // Protects the /admin route from unauthorized access
-    // [개발용] 관리자 페이지 접근 제한 해제 (빠른 테스트를 위함)
-    /*
-    if (false && request.nextUrl.pathname.startsWith('/admin')) {
+    // 1. Admin 로그인 여부만 체크 (role 검증은 admin/layout.tsx에서 DB 조회로 처리)
+    if (request.nextUrl.pathname.startsWith('/admin')) {
         if (!user) {
-            // If not logged in, redirect to login page
+            // 미로그인 시 로그인 페이지로 리다이렉트
             const url = request.nextUrl.clone()
             url.pathname = '/login'
             url.searchParams.set('next', request.nextUrl.pathname)
             return NextResponse.redirect(url)
         }
-
-        // Check Admin Role
-        // 1. Check specific email (hardcoded for safety/simplicity in this stage)
-        // 2. Check 'is_admin' metadata (future proofing)
-        // 3. Check 'role' metadata (standard pattern)
-        const isAdmin =
-            user.email === 'admin@fashion.local' ||
-            user.user_metadata?.is_admin === true ||
-            user.user_metadata?.role === 'admin' ||
-            user.app_metadata?.role === 'admin';
-
-        if (!isAdmin) {
-            console.warn(`[Middleware] Unauthorized access attempt to /admin by ${user.email}`);
-            // Redirect unauthorized users to home
-            return NextResponse.redirect(new URL('/', request.url))
-        }
+        // role 검증은 admin/layout.tsx 서버 컴포넌트에서 profiles DB 조회로 처리
     }
-    */
 
     // 2. Profile Setup Enforcement
+    // 로그인한 사용자가 프로필 설정을 완료하지 않은 경우 설정 페이지로 강제 이동
     if (user) {
-        // Check if on setup page already
         if (request.nextUrl.pathname === '/profile/setup') {
             return response
         }
 
-        // Check metadata for setup completion
-        // Note: We rely on user_metadata.is_setup_finished to be true
-        // If it's missing or false, we redirect to setup
         const isSetupFinished = user.user_metadata.is_setup_finished === true
 
         if (!isSetupFinished) {
@@ -96,8 +94,7 @@ export const config = {
          * - login (login page)
          * - auth (auth callback)
          * - api (API routes)
-         * Feel free to modify this pattern to include more paths.
          */
-        '/((?!_next/static|_next/image|favicon.ico|login|auth|api|checkout|order-lookup|cart|products).*)',
+        '/((?!_next/static|_next/image|favicon.ico|login|auth|api|checkout|order-lookup|cart|products|$).*)',
     ],
 }

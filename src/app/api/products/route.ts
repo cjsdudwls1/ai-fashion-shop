@@ -4,54 +4,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { productStore, parseColorStock, parseSizeStock } from '@/lib/productStore';
-import { generateProductVideo } from '@/lib/aiVideoService';
-import { Product, ProductInput } from '@/lib/types';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { Product } from '@/lib/types';
 import { productSchema } from '@/lib/validations';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAdmin, handleAuthError } from '@/lib/authUtils';
+import type { ZodIssue } from 'zod';
 
 // 고유 ID 생성
 function generateId(): string {
     return `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// Admin 권한 확인 유틸리티
-async function checkAdminAuth() {
-    return true; // [개발용] 모든 요청 허용 (관리자 권한 체크 우회)
-    // TODO: 운영 배포 시 반드시 원래 로직으로 복구해야 함
-
-    /*
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() { return cookieStore.getAll() },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        );
-                    } catch { }
-                },
-            },
-        }
-    );
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) return false;
-
-    const isAdmin =
-        user.email === 'admin@fashion.local' ||
-        user.user_metadata?.is_admin === true ||
-        user.user_metadata?.role === 'admin' ||
-        user.app_metadata?.role === 'admin';
-
-    return isAdmin;
-    */
 }
 
 // GET: 전체 상품 조회
@@ -60,13 +21,18 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
 
-        let products;
+        // 삭제된 상품(trash) 조회는 관리자만 허용
         if (status === 'trash') {
-            products = await productStore.getTrashProducts();
-        } else {
-            products = await productStore.getAllProducts();
+            try {
+                await requireAdmin();
+            } catch (e) {
+                return handleAuthError(e) ?? NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
+            }
+            const products = await productStore.getTrashProducts();
+            return NextResponse.json({ products });
         }
 
+        const products = await productStore.getAllProducts();
         return NextResponse.json({ products });
     } catch (error) {
         console.error('상품 조회 오류:', error);
@@ -79,10 +45,11 @@ export async function GET(request: NextRequest) {
 
 // POST: 새 상품 등록
 export async function POST(request: NextRequest) {
-    // Admin 권한 체크
-    const isAdmin = await checkAdminAuth();
-    if (!isAdmin) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 관리자 권한 검증
+    try {
+        await requireAdmin();
+    } catch (e) {
+        return handleAuthError(e) ?? NextResponse.json({ error: '인증 오류' }, { status: 500 });
     }
 
     try {
@@ -92,7 +59,7 @@ export async function POST(request: NextRequest) {
         const validationResult = productSchema.safeParse(json);
 
         if (!validationResult.success) {
-            const errorMessage = validationResult.error.issues.map((e: any) => e.message).join(', ');
+            const errorMessage = validationResult.error.issues.map((e: ZodIssue) => e.message).join(', ');
             return NextResponse.json(
                 { error: `Validation Error: ${errorMessage}` },
                 { status: 400 }
@@ -100,6 +67,9 @@ export async function POST(request: NextRequest) {
         }
 
         const body = validationResult.data;
+
+        // 미디어 생성 타입 (기본값: video)
+        const mediaGenerationType = body.mediaGenerationType || 'video';
 
         // 상품 ID 생성
         const productId = generateId();
@@ -115,9 +85,9 @@ export async function POST(request: NextRequest) {
         const newProduct: Product = {
             id: productId,
             name: body.name,
-            imageUrl: body.imageBase64, // Base64 이미지 직접 저장 (Primary)
-            galleryImages: body.galleryImages?.map(img => ({
-                url: img.base64,
+            imageUrl: body.imageUrl || body.imageBase64 || '', // Base64 대신 URL 사용
+            galleryImages: body.galleryImages?.map((img: any) => ({
+                url: img.url || img.base64 || '',
                 color: img.color,
                 isPrimary: img.isPrimary
             })) || [], // 갤러리 이미지 저장
@@ -128,38 +98,38 @@ export async function POST(request: NextRequest) {
             sizes,
             videoUrl: null,
             audioUrl: null,
-            videoStatus: 'pending',
+            videoStatus: mediaGenerationType === 'none' ? 'completed' : 'pending',
+            mediaGenerationType,
+            narrationText: body.narrationText || null,
+            videoModel: body.videoModel || null,
             price: body.price, // Add price
             createdAt: new Date(),
         };
 
         // 저장소에 추가
         await productStore.addProduct(newProduct, supabaseAdmin);
-        console.log(`[Product] 새 상품 등록: ${productId} - ${body.name} (${gender === 'female' ? '여성복' : '남성복'})`);
+        console.log(`[Product] 새 상품 등록: ${productId} - ${body.name} (${gender === 'female' ? '여성복' : '남성복'}) [미디어: ${mediaGenerationType}]`);
 
-        // AI 영상 생성 자동 트리거 (비동기 - 응답 대기 안 함)
-        console.log(`[Product] AI 영상 생성 트리거 시작...`);
+        // AI 미디어 생성 자동 트리거 (video 또는 image 선택 시)
+        if (mediaGenerationType === 'video' || mediaGenerationType === 'image') {
+            console.log(`[Product] AI 미디어 생성 트리거 시작... (Sync Worker 킥오프) [모드: ${mediaGenerationType}]`);
 
-        // setTimeout을 사용하여 응답 후에도 실행되도록 보장
-        setTimeout(() => {
-            console.log(`[Product] setTimeout 내부 - generateProductVideo 호출`);
-            generateProductVideo(productId, body.imageBase64, {
-                name: body.name,
-                fabric: body.fabric,
-                gender: body.gender as 'female' | 'male' | 'unisex',
-                category: body.category, // Pass category for prompt generation
-                narrationText: body.narrationText, // Pass custom narration
-            }).then(() => {
-                console.log(`[Product] AI 영상+음성 생성 완료`);
-            }).catch(err => {
-                console.error(`[Product] 영상 생성 실패:`, err.message || err);
-            });
-        }, 100);
+            // Vercel, Netlify 타임아웃 방지: 비동기 워커로 실제 처리를 이관함
+            const host = request.headers.get('host');
+            const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+            fetch(`${protocol}://${host}/api/admin/videos/sync`, { method: 'GET' }).catch(() => { });
+        } else {
+            console.log(`[Product] 미디어 생성 건너뜀 (선택: ${mediaGenerationType})`);
+        }
 
         return NextResponse.json({
             success: true,
             product: newProduct,
-            message: '상품이 등록되었습니다. AI 영상이 자동으로 생성됩니다.',
+            message: mediaGenerationType === 'video'
+                ? '상품이 등록되었습니다. AI 영상이 백그라운드에서 안전하게 생성됩니다.'
+                : mediaGenerationType === 'image'
+                    ? '상품이 등록되었습니다. AI 이미지가 백그라운드에서 생성됩니다.'
+                    : '상품이 등록되었습니다.',
         });
 
     } catch (error) {
@@ -172,10 +142,11 @@ export async function POST(request: NextRequest) {
 }
 // DELETE: 상품 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
-    // Admin 권한 체크
-    const isAdmin = await checkAdminAuth();
-    if (!isAdmin) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 관리자 권한 검증
+    try {
+        await requireAdmin();
+    } catch (e) {
+        return handleAuthError(e) ?? NextResponse.json({ error: '인증 오류' }, { status: 500 });
     }
 
     try {
