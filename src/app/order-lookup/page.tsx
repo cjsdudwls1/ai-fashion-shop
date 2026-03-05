@@ -300,28 +300,33 @@ export default function OrderLookupPage() {
 
                 {/* 조회 결과 */}
                 {order && (
-                    <div className="mt-8 animate-fade-in-down w-full max-w-2xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div className="mt-8 animate-fade-in-down w-full max-w-2xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* 입금 안내 정보 창 (입금 대기 중이거나 주문 확인 중일 때 표시) */}
                         {(order.status === 'pending_payment' || order.status === 'payment_confirming') && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-900/50 p-6 sm:p-8 rounded-2xl shadow-sm">
-                                <h2 className="text-lg font-black text-amber-900 dark:text-amber-500 mb-3 tracking-wide">입금 안내</h2>
-                                <p className="text-[15px] font-medium text-amber-800 dark:text-amber-400/90 mb-5">아래 계좌로 결제 금액을 입금해주셔야 주문 확인 및 배송 절차가 진행됩니다.</p>
-                                <div className="bg-white dark:bg-[#121212] p-5 rounded-xl border border-amber-100 dark:border-amber-900/40" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="bg-gray-50 dark:bg-[#1A1A1A] border border-gray-200 dark:border-gray-700 p-6 sm:p-8 rounded-2xl">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--primary-color)]/10 flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-4 h-4 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                    </div>
+                                    <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-wide">입금 안내</h2>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">아래 계좌로 결제 금액을 입금해주셔야 주문 확인 및 배송 절차가 진행됩니다.</p>
+                                <div className="bg-white dark:bg-[#121212] p-5 rounded-xl border border-gray-100 dark:border-gray-800" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-500 dark:text-gray-400 font-medium text-[15px]">입금 은행</span>
-                                        <span className="font-bold text-gray-900 dark:text-white text-[15px]">{ADMIN_BANK_INFO.bankName}</span>
+                                        <span className="text-gray-400 dark:text-gray-500 font-medium text-sm">입금 은행</span>
+                                        <span className="font-bold text-gray-900 dark:text-white text-sm">{ADMIN_BANK_INFO.bankName}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-500 dark:text-gray-400 font-medium text-[15px]">계좌 번호</span>
-                                        <span className="font-bold text-gray-900 dark:text-white text-[15px] tracking-wider">{ADMIN_BANK_INFO.accountNumber}</span>
+                                        <span className="text-gray-400 dark:text-gray-500 font-medium text-sm">계좌 번호</span>
+                                        <span className="font-bold text-gray-900 dark:text-white text-sm tracking-wider">{ADMIN_BANK_INFO.accountNumber}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-500 dark:text-gray-400 font-medium text-[15px]">예금주</span>
-                                        <span className="font-bold text-gray-900 dark:text-white text-[15px]">{ADMIN_BANK_INFO.accountHolder}</span>
+                                        <span className="text-gray-400 dark:text-gray-500 font-medium text-sm">예금주</span>
+                                        <span className="font-bold text-gray-900 dark:text-white text-sm">{ADMIN_BANK_INFO.accountHolder}</span>
                                     </div>
-                                    <div className="flex justify-between items-center pt-3 mt-1 border-t border-gray-100 dark:border-gray-800">
-                                        <span className="text-gray-500 dark:text-gray-400 font-medium text-[15px]">입금하실 금액</span>
-                                        <span className="font-black text-xl text-amber-600 dark:text-amber-500">{order.total_amount?.toLocaleString()}원</span>
+                                    <div className="flex justify-between items-center pt-4 mt-1 border-t border-gray-100 dark:border-gray-800">
+                                        <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">입금하실 금액</span>
+                                        <span className="font-black text-xl text-[var(--primary-color)]">{order.total_amount?.toLocaleString()}원</span>
                                     </div>
                                 </div>
                             </div>
@@ -329,80 +334,85 @@ export default function OrderLookupPage() {
 
                         {/* 결제 완료(관리자 확인) 안내 창 */}
                         {order.status === 'paid' && (
-                            <div className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-200 dark:border-emerald-900/50 p-6 sm:p-8 rounded-2xl shadow-sm">
-                                <h2 className="text-lg font-black text-emerald-900 dark:text-emerald-500 mb-3 tracking-wide">주문 확인 완료 🎉</h2>
-                                <p className="text-[15px] font-medium text-emerald-800 dark:text-emerald-400/90 leading-relaxed">
-                                    고객님의 입금 내역 및 주문을 <span className="font-black text-emerald-900 dark:text-emerald-300">관리자가 정상적으로 확인</span>하였습니다.<br />
-                                    현재 아름다운 패션 상품을 꼼꼼히 준비 중이며, 준비가 완료되는 대로 빠르게 배송해 드리겠습니다.
+                            <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-6 sm:p-8 rounded-2xl">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                    <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-400 tracking-wide">주문 확인 완료</h2>
+                                </div>
+                                <p className="text-sm text-emerald-700 dark:text-emerald-400/90 leading-relaxed">
+                                    고객님의 입금 내역 및 주문을 <span className="font-bold">관리자가 정상적으로 확인</span>하였습니다.<br />
+                                    현재 상품을 꼼꼼히 준비 중이며, 준비가 완료되는 대로 빠르게 배송해 드리겠습니다.
                                 </p>
                             </div>
                         )}
 
-                        {/* 주문 상태 */}
-                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-                            <div className="flex items-center justify-between mb-5 border-b border-gray-100 dark:border-gray-800 pb-4">
-                                <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-wide">주문 상세</h2>
-                                <span className={`px-5 py-2.5 rounded-full text-[13px] font-bold shadow-sm leading-normal ${getStatusText(order.status).color}`}>
+                        {/* 주문 상세 */}
+                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl border border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-wide">주문 상세</h2>
+                                <span className={`px-4 py-2 rounded-full text-xs font-bold leading-normal ${getStatusText(order.status).color}`}>
                                     {getStatusText(order.status).label}
                                 </span>
                             </div>
-                            <div className="text-[15px]" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-[#121212] p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <span className="text-gray-500 dark:text-gray-400 font-bold">주문 코드</span>
-                                    <span className="font-black text-gray-900 dark:text-white tracking-[0.2em]">{order.guest_order_code}</span>
+                            <div className="text-sm" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div className="flex justify-between items-center bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium">주문 코드</span>
+                                    <span className="font-black text-gray-900 dark:text-white tracking-[0.2em] text-base">{order.guest_order_code}</span>
                                 </div>
-                                <div className="flex justify-between items-center px-2 py-1">
-                                    <span className="text-gray-500 dark:text-gray-400 font-medium">주문 일시</span>
+                                <div className="flex justify-between items-center px-2 py-2">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium">주문 일시</span>
                                     <span className="text-gray-900 dark:text-white font-medium">{new Date(order.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
-                                <div className="flex justify-between items-center px-2 py-1">
-                                    <span className="text-gray-500 dark:text-gray-400 font-medium">총 결제 금액</span>
-                                    <span className="font-black text-xl text-sky-600 dark:text-sky-400">{order.total_amount?.toLocaleString()}원</span>
+                                <div className="flex justify-between items-center px-2 py-2">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium">총 결제 금액</span>
+                                    <span className="font-black text-lg text-[var(--primary-color)]">{order.total_amount?.toLocaleString()}원</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* 배송지 정보 */}
-                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-                            <h2 className="text-lg font-black text-gray-900 dark:text-white mb-5 border-b border-gray-100 dark:border-gray-800 pb-4 tracking-wide">배송지 정보</h2>
-                            <div className="text-[15px] px-2" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500 dark:text-gray-400 font-medium">받는 분</span>
+                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl border border-gray-100 dark:border-gray-800">
+                            <h2 className="text-base font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-800 tracking-wide">배송지 정보</h2>
+                            <div className="text-sm px-1" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">받는 분</span>
                                     <span className="text-gray-900 dark:text-white font-bold">{order.shipping_name}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500 dark:text-gray-400 font-medium">연락처</span>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">연락처</span>
                                     <span className="text-gray-900 dark:text-white font-bold">{order.shipping_phone}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500 dark:text-gray-400 font-medium">주소</span>
-                                    <span className="text-gray-900 dark:text-white font-bold text-right max-w-[65%] leading-relaxed">{order.shipping_address}</span>
+                                <div className="flex justify-between items-start">
+                                    <span className="text-gray-400 dark:text-gray-500 font-medium flex-shrink-0 pt-0.5">주소</span>
+                                    <span className="text-gray-900 dark:text-white font-medium text-right max-w-[70%] leading-7 break-keep">{order.shipping_address}</span>
                                 </div>
                                 {order.shipping_memo && (
-                                    <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 border-dashed">
-                                        <span className="text-gray-500 dark:text-gray-400 font-medium">배송 메모</span>
-                                        <span className="text-gray-900 dark:text-white font-medium text-right max-w-[65%]">{order.shipping_memo}</span>
+                                    <div className="flex justify-between items-start mt-2 pt-4 border-t border-gray-100 dark:border-gray-800 border-dashed">
+                                        <span className="text-gray-400 dark:text-gray-500 font-medium flex-shrink-0 pt-0.5">배송 메모</span>
+                                        <span className="text-gray-700 dark:text-gray-300 font-medium text-right max-w-[70%] leading-7">{order.shipping_memo}</span>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* 주문 상품 */}
-                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-                            <h2 className="text-lg font-black text-gray-900 dark:text-white mb-5 border-b border-gray-100 dark:border-gray-800 pb-4 tracking-wide">주문 상품</h2>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="bg-white dark:bg-[#1A1A1A] p-6 sm:p-8 rounded-2xl border border-gray-100 dark:border-gray-800">
+                            <h2 className="text-base font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-800 tracking-wide">주문 상품</h2>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {order.order_items?.map((item) => (
-                                    <div key={item.id} className="flex justify-between items-center py-4 px-2 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors rounded-xl">
+                                    <div key={item.id} className="flex justify-between items-center py-4 px-3 border-b border-gray-50 dark:border-gray-800/50 last:border-0 rounded-xl">
                                         <div>
-                                            <p className="font-bold text-gray-900 dark:text-white text-[15px] mb-1.5">{item.product_title || '상품'}</p>
+                                            <p className="font-bold text-gray-900 dark:text-white text-sm mb-2">{item.product_title || '상품'}</p>
                                             <div className="flex gap-1.5">
-                                                {item.item_option?.color && <span className="text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-700">{item.item_option.color}</span>}
-                                                {item.item_option?.size && <span className="text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-700">{item.item_option.size}</span>}
+                                                {item.item_option?.color && <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-md border border-gray-100 dark:border-gray-700">{item.item_option.color}</span>}
+                                                {item.item_option?.size && <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-md border border-gray-100 dark:border-gray-700">{item.item_option.size}</span>}
                                             </div>
                                         </div>
                                         <div className="text-right pl-4">
-                                            <p className="text-[15px] font-black text-gray-900 dark:text-white tracking-wide">{item.price_at_purchase?.toLocaleString()}원</p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5">{item.quantity}개</p>
+                                            <p className="text-sm font-black text-gray-900 dark:text-white">{item.price_at_purchase?.toLocaleString()}원</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mt-1">{item.quantity}개</p>
                                         </div>
                                     </div>
                                 ))}

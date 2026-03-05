@@ -174,7 +174,7 @@ export async function triggerVeoVideo(
 }
 
 // ============================================================================
-// Veo 영상 생성 상태 확인 (폴링)
+// Veo 영상 생성 상태 확인 (SDK 기반 폴링)
 // ============================================================================
 export async function checkVeoVideo(operationName: string): Promise<{
     status: 'running' | 'succeed' | 'failed';
@@ -182,34 +182,40 @@ export async function checkVeoVideo(operationName: string): Promise<{
     error?: string;
 }> {
     try {
-        // REST API를 사용하여 operation 상태를 폴링
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
-            {
-                headers: {
-                    'x-goog-api-key': GOOGLE_API_KEY,
-                },
-            }
-        );
+        // REST API를 직접 호출하여 operation 상태 조회
+        // (SDK의 getVideosOperation은 generateVideos()에서 반환된 전체 객체가 필요하므로,
+        //  operation name 문자열만으로는 사용 불가)
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${GOOGLE_API_KEY}`;
+        const response = await fetch(apiUrl);
 
         if (!response.ok) {
-            console.error(`[Veo] 폴링 HTTP 에러: ${response.status}`);
-            return { status: 'running', error: `HTTP ${response.status}` };
+            const errorText = await response.text();
+            console.error(`[Veo] 폴링 API 오류 (HTTP ${response.status}):`, errorText);
+            return { status: 'running', error: `HTTP ${response.status}: ${errorText}` };
         }
 
-        const data = await response.json();
+        const operation = await response.json();
 
-        if (data.done === true) {
-            // 완료 - 영상 URI 추출
-            const videoUri = data.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
-            if (videoUri) {
-                console.log(`[Veo] 영상 생성 완료! URI: ${videoUri.substring(0, 80)}...`);
-                return { status: 'succeed', videoUri };
+        if (operation.done) {
+            // REST API 응답 구조: response.generateVideoResponse.generatedSamples[].video.uri
+            // SDK 응답 구조:     response.generatedVideos[].video.uri
+            // 두 구조 모두 호환하도록 처리
+            const restSamples = operation.response?.generateVideoResponse?.generatedSamples;
+            const sdkVideos = operation.response?.generatedVideos;
+            const samples = restSamples || sdkVideos;
+
+            if (samples && samples.length > 0) {
+                const videoUri = samples[0].video?.uri;
+                if (videoUri) {
+                    console.log(`[Veo] 영상 생성 완료! URI: ${videoUri.substring(0, 80)}...`);
+                    return { status: 'succeed', videoUri };
+                }
             }
 
-            // 에러로 완료된 경우
-            const errorMsg = data.error?.message || '영상 URI를 찾을 수 없습니다.';
+            // 에러로 완료된 경우 또는 응답 구조가 예상과 다른 경우
+            const errorMsg = operation.error?.message || '영상 URI를 찾을 수 없습니다.';
             console.error(`[Veo] 영상 생성 실패:`, errorMsg);
+            console.error(`[Veo] 응답 구조 디버그:`, JSON.stringify(operation.response || {}).substring(0, 500));
             return { status: 'failed', error: errorMsg };
         }
 
@@ -220,6 +226,32 @@ export async function checkVeoVideo(operationName: string): Promise<{
         console.error('[Veo] 폴링 오류:', error);
         return { status: 'running', error: String(error) };
     }
+}
+
+// ============================================================================
+// Veo 영상 다운로드 (ArrayBuffer 반환)
+// URI에 API 키를 쿼리 파라미터로 전달하는 공식 패턴 사용
+// ============================================================================
+export async function downloadVeoVideo(videoUri: string): Promise<ArrayBuffer> {
+    // 공식 패턴: URI에 API 키를 쿼리 파라미터로 전달
+    const separator = videoUri.includes('?') ? '&' : '?';
+    const downloadUrl = `${videoUri}${separator}key=${GOOGLE_API_KEY}`;
+
+    console.log(`[Veo] 영상 다운로드 시작: ${videoUri.substring(0, 80)}...`);
+
+    const response = await fetch(downloadUrl, { redirect: 'follow' });
+
+    if (!response.ok) {
+        throw new Error(`영상 다운로드 실패: HTTP ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    console.log(`[Veo] 응답 Content-Type: ${contentType}`);
+
+    const arrayBuffer = await response.arrayBuffer();
+    console.log(`[Veo] 영상 다운로드 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+
+    return arrayBuffer;
 }
 
 // ============================================================================

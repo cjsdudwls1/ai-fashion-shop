@@ -277,23 +277,24 @@ export default function AdminOrdersPage() {
             />
 
             {/* ─── 콘텐츠 영역 ─── */}
-            <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '72px 24px 120px' }}>
+            <div className="admin-orders-content" style={{ maxWidth: '1280px', margin: '0 auto', padding: '72px 24px 120px' }}>
 
                 {/* ━━━ Header ━━━ */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <h1 style={{ fontSize: '33px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                <div className="admin-orders-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h1 className="admin-orders-title" style={{ fontSize: '33px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                         주문 관리
                     </h1>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="admin-orders-header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         {/* 전체 총액 */}
                         {orders.length > 0 && (
                             <div style={{ textAlign: 'right' }}>
                                 <span style={{ fontSize: '18px', color: 'var(--text-muted)', display: 'block' }}>총 {orders.length}건</span>
-                                <span style={{ fontSize: '27px', fontWeight: 700, color: 'var(--text-primary)' }}>{totalAmount.toLocaleString()}원</span>
+                                <span className="admin-orders-total-amount" style={{ fontSize: '27px', fontWeight: 700, color: 'var(--text-primary)' }}>{totalAmount.toLocaleString()}원</span>
                             </div>
                         )}
                         <button
                             onClick={fetchOrders}
+                            className="admin-refresh-btn"
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '6px',
                                 padding: '12px 20px', fontSize: '20px', fontWeight: 600,
@@ -329,6 +330,7 @@ export default function AdminOrdersPage() {
                                 <button
                                     key={filter.key}
                                     onClick={() => setActiveFilter(filter.key)}
+                                    className="admin-filter-btn"
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: '6px',
                                         padding: '10px 18px',
@@ -345,7 +347,7 @@ export default function AdminOrdersPage() {
                                     }}
                                 >
                                     {filter.label}
-                                    <span style={{
+                                    <span className="admin-filter-count" style={{
                                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                         minWidth: '28px', height: '28px',
                                         padding: '0 6px',
@@ -392,6 +394,7 @@ export default function AdminOrdersPage() {
                                     {/* ── Order Row ── */}
                                     <div
                                         onClick={() => toggleExpand(order.id)}
+                                        className="admin-order-row"
                                         style={{
                                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                             padding: '20px 24px',
@@ -403,7 +406,7 @@ export default function AdminOrdersPage() {
                                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                                     >
                                         {/* Left: 아이콘 + 주문자 중심 정보 */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                                        <div className="admin-order-row-left" style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                                             {/* 펼침 아이콘 */}
                                             <div style={{
                                                 width: '36px', height: '36px', borderRadius: '10px',
@@ -439,7 +442,7 @@ export default function AdminOrdersPage() {
                                             </span>
 
                                             {/* 주문번호 (보조 정보로 축소) */}
-                                            <span style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0, letterSpacing: '0.03em' }}>
+                                            <span className="admin-order-number" style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0, letterSpacing: '0.03em' }}>
                                                 <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>주문번호</span> #{order.guest_order_code || order.id.slice(0, 8)}
                                             </span>
 
@@ -453,7 +456,7 @@ export default function AdminOrdersPage() {
                                         </div>
 
                                         {/* Right: 날짜(모바일) + 금액 */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+                                        <div className="admin-order-row-right" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
                                             <span style={{ fontSize: '16px', color: 'var(--text-muted)', display: 'block' }} className="sm-hide-inline">
                                                 {new Date(order.created_at).toLocaleDateString('ko-KR', {
                                                     month: 'short', day: 'numeric',
@@ -713,6 +716,58 @@ export default function AdminOrdersPage() {
                 @media (max-width: 639px) {
                     .sm-show { display: none !important; }
                     .sm-hide-inline { display: inline !important; }
+                }
+                @media (max-width: 767px) {
+                    .admin-orders-header {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        gap: 12px !important;
+                    }
+                    .admin-orders-header-right {
+                        width: 100% !important;
+                        justify-content: space-between !important;
+                    }
+                    .admin-order-row {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        padding: 16px !important;
+                        gap: 10px !important;
+                    }
+                    .admin-order-row-left {
+                        flex-wrap: wrap !important;
+                        gap: 8px !important;
+                    }
+                    .admin-order-row-right {
+                        width: 100% !important;
+                        justify-content: space-between !important;
+                        padding-top: 8px !important;
+                        border-top: 1px solid var(--border-color) !important;
+                    }
+                    .admin-order-number {
+                        display: none !important;
+                    }
+                    .admin-filter-btn {
+                        padding: 8px 12px !important;
+                        font-size: 15px !important;
+                    }
+                    .admin-filter-count {
+                        min-width: 22px !important;
+                        height: 22px !important;
+                        font-size: 13px !important;
+                    }
+                    .admin-orders-title {
+                        font-size: 24px !important;
+                    }
+                    .admin-orders-total-amount {
+                        font-size: 20px !important;
+                    }
+                    .admin-orders-content {
+                        padding: 40px 16px 80px !important;
+                    }
+                    .admin-refresh-btn {
+                        padding: 10px 14px !important;
+                        font-size: 15px !important;
+                    }
                 }
             `}</style>
         </div>

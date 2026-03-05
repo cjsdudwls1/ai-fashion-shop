@@ -43,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
-        <Toaster position="top-center" />
+        <Toaster position="top-center" containerStyle={{ top: 76 }} />
         <Navigation />
 
         {/* 메인 컨텐츠 */}
@@ -53,7 +53,7 @@ export default function RootLayout({
 
         {/* 푸터 */}
         <footer className="py-8 px-6 text-center text-sm border-t">
-          <p>MVP Demo - AI 아바타 영상 자동 생성 쇼핑몰</p>
+          <p>&copy; {new Date().getFullYear()} AI Fashion Shop. All rights reserved.</p>
         </footer>
       </body>
     </html>

@@ -403,23 +403,23 @@ export function ProductDetailView({ product }: { product: Product }) {
             )}
 
             {/* 모바일 Sticky CTA (lg 미만) */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[var(--bg-card)] border-t border-[var(--border-color)] shadow-[0_-4px_12px_rgba(0,0,0,0.08)]" style={{ padding: '12px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
-                <div className="grid grid-cols-2 gap-3">
+            <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[var(--bg-card)] border-t border-[var(--border-color)] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]" style={{ padding: '14px 16px', paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))' }}>
+                <div className="grid gap-3" style={{ gridTemplateColumns: '2fr 3fr' }}>
                     <button
                         onClick={handleAddToCart}
-                        className="py-3.5 rounded-lg border-2 border-[var(--text-primary)] font-bold text-[var(--text-primary)] bg-transparent flex items-center justify-center gap-2 text-sm"
+                        className="py-4 rounded-xl border-2 border-[var(--text-primary)] font-extrabold text-[var(--text-primary)] bg-transparent flex items-center justify-center gap-2 text-base active:scale-95 transition-transform"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
                         담기
                     </button>
                     <button
                         onClick={handleBuyNow}
                         disabled={isPurchasing}
-                        className={`py-3.5 rounded-lg font-bold text-sm ${isPurchasing
+                        className={`py-4 rounded-xl font-extrabold text-base active:scale-95 transition-transform ${isPurchasing
                             ? 'bg-gray-400 cursor-not-allowed text-white'
-                            : 'bg-[var(--primary-color)] text-white'
+                            : 'bg-[var(--primary-color)] text-white shadow-lg'
                             }`}
                     >
                         {isPurchasing ? '처리중...' : '바로 구매'}

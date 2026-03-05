@@ -495,26 +495,27 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
     const totalStock = calcTotalStock(skus);
     const isOutOfStock = totalStock === 0;
     const isLowStock = totalStock > 0 && totalStock < 5;
-    const isLegacyCombined = skus.length > 0 && product.colors?.length > 0 && product.sizes?.length > 0;
 
     return (
-        <div style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 2fr 1fr auto',
-            alignItems: 'center',
-            gap: '0',
-            padding: '20px 24px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-            transition: 'box-shadow 0.2s',
-        }}
+        <div
+            className="inventory-product-row"
+            style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 2fr 1fr auto',
+                alignItems: 'center',
+                gap: '0',
+                padding: '20px 24px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                transition: 'box-shadow 0.2s',
+            }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'; }}
         >
             {/* 상품 정보 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className="inventory-product-info" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
                     width: '64px', height: '64px', borderRadius: '12px',
                     overflow: 'hidden', flexShrink: 0,
@@ -529,49 +530,60 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
                     )}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '21px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>{product.name}</div>
-                    <div style={{ fontSize: '19px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>{product.price?.toLocaleString() || 0}원</div>
-                    <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-muted)', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={product.id}>
+                    <div className="inventory-product-name" style={{ fontSize: '21px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>{product.name}</div>
+                    <div className="inventory-product-price" style={{ fontSize: '19px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>{product.price?.toLocaleString() || 0}원</div>
+                    <div className="inventory-product-id" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-muted)', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={product.id}>
                         ID: {product.id.split('_')[1] || product.id}
                     </div>
                 </div>
             </div>
 
             {/* 옵션별 재고 (SKU) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '140px' }}>
+            <div className="inventory-sku-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '140px' }}>
                 {skus.length > 0 ? (
                     skus.map((sku, i) => (
-                        <div key={i} style={{
+                        <div key={i} className="inventory-sku-item" style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                             fontSize: '18px', padding: '10px 16px', borderRadius: '8px',
                             background: 'var(--bg-elevated)', border: '1px solid var(--border-color)',
                         }}>
                             <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '12px' }}>{sku.name}</span>
-                            <span style={{ fontWeight: 700, color: sku.quantity < 3 ? '#ef4444' : 'var(--text-primary)' }}>
-                                {sku.quantity}개
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                <span style={{ fontWeight: 700, color: sku.quantity < 3 ? '#ef4444' : 'var(--text-primary)' }}>
+                                    {sku.quantity}개
+                                </span>
+                                {sku.quantity === 0 && (
+                                    <span style={{
+                                        fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',
+                                        background: '#374151', color: '#9ca3af', lineHeight: '16px',
+                                    }}>품절</span>
+                                )}
+                            </div>
                         </div>
                     ))
                 ) : (
                     <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>옵션 없음</span>
                 )}
-                {isLegacyCombined && (
-                    <div style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'right', fontWeight: 500, marginTop: '4px' }}>
-                        ※ 기존 분리형 정보 통합 표시
-                    </div>
-                )}
             </div>
 
             {/* 총 재고 + 상태 배지 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                <span style={{
-                    fontSize: '30px', fontWeight: 800,
-                    color: isOutOfStock ? '#9ca3af' : isLowStock ? '#ef4444' : 'var(--text-primary)',
-                    textDecoration: isOutOfStock ? 'line-through' : 'none',
-                    lineHeight: 1,
+            <div className="inventory-total-stock" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                <div className="inventory-total-stock-inner" style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    padding: '12px 16px', borderRadius: '12px',
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border-color)',
+                    minWidth: '80px',
                 }}>
-                    {totalStock}개
-                </span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>총 재고</span>
+                    <span style={{
+                        fontSize: '28px', fontWeight: 800,
+                        color: isOutOfStock ? '#9ca3af' : isLowStock ? '#ef4444' : 'var(--text-primary)',
+                        textDecoration: isOutOfStock ? 'line-through' : 'none',
+                        lineHeight: 1,
+                    }}>
+                        {totalStock}개
+                    </span>
+                </div>
                 {isOutOfStock && (
                     <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -596,8 +608,8 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
                 )}
             </div>
 
-            {/* 관리 버튼 - 수정(Primary) / 삭제(Secondary, 시각적 분리) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end', paddingLeft: '20px' }}>
+            {/* 관리 버튼 */}
+            <div className="inventory-action-btns" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end', paddingLeft: '20px' }}>
                 <button
                     onClick={onEdit}
                     style={{
@@ -671,17 +683,17 @@ export default function AdminInventoryPage() {
 
     useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
-    // ── 삭제 ──
+    // ── 삭제 (영구 삭제 - Cloudinary 리소스 포함) ──
     const handleDelete = async (id: string) => {
-        if (!confirm('정말 이 상품을 삭제하시겠습니까? (휴지통으로 이동합니다)')) return;
+        if (!confirm('정말 이 상품을 영구 삭제하시겠습니까?\n\nCloudinary 이미지/영상도 함께 삭제되며, 복구할 수 없습니다.')) return;
         try {
-            const res = await fetch('/api/products', {
+            const res = await fetch('/api/products?action=permanent', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: [id] }),
             });
             if (res.ok) {
-                toast.success('상품이 삭제되었습니다.');
+                toast.success('상품이 영구 삭제되었습니다. (Cloudinary 리소스 포함)');
                 fetchInventory();
             } else {
                 toast.error('삭제에 실패했습니다.');
@@ -797,12 +809,14 @@ export default function AdminInventoryPage() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {/* 테이블 헤더 */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '2fr 2fr 1fr auto',
-                                padding: '12px 24px',
-                                gap: '0',
-                            }}>
+                            <div
+                                className="inventory-table-header"
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '2fr 2fr 1fr auto',
+                                    padding: '12px 24px',
+                                    gap: '0',
+                                }}>
                                 <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상품 정보</span>
                                 <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>옵션별 재고</span>
                                 <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>총 재고</span>
@@ -847,6 +861,74 @@ export default function AdminInventoryPage() {
                     onClose={() => setEditingProduct(null)}
                 />
             )}
+
+            {/* 모바일 반응형 스타일 */}
+            <style jsx global>{`
+                @media (max-width: 767px) {
+                    .inventory-table-header {
+                        display: none !important;
+                    }
+                    .inventory-product-row {
+                        grid-template-columns: 1fr !important;
+                        gap: 0 !important;
+                        padding: 0 !important;
+                        overflow: hidden !important;
+                    }
+                    /* 상품 정보 영역 */
+                    .inventory-product-info {
+                        padding: 16px !important;
+                        gap: 12px !important;
+                        border-bottom: 1px solid var(--border-color) !important;
+                    }
+                    .inventory-product-name {
+                        font-size: 16px !important;
+                    }
+                    .inventory-product-price {
+                        font-size: 15px !important;
+                    }
+                    .inventory-product-id {
+                        font-size: 12px !important;
+                        max-width: 180px !important;
+                    }
+                    /* 옵션별 재고 */
+                    .inventory-sku-list {
+                        padding: 12px 16px !important;
+                        min-width: 0 !important;
+                        gap: 6px !important;
+                        border-bottom: 1px solid var(--border-color) !important;
+                    }
+                    .inventory-sku-item {
+                        font-size: 14px !important;
+                        padding: 8px 12px !important;
+                    }
+                    /* 총 재고 */
+                    .inventory-total-stock {
+                        padding: 12px 16px !important;
+                        align-items: stretch !important;
+                        border-bottom: 1px solid var(--border-color) !important;
+                    }
+                    .inventory-total-stock-inner {
+                        flex-direction: row !important;
+                        justify-content: space-between !important;
+                        padding: 10px 14px !important;
+                    }
+                    /* 관리 버튼 */
+                    .inventory-action-btns {
+                        flex-direction: row !important;
+                        padding: 12px 16px !important;
+                        padding-left: 16px !important;
+                        width: 100% !important;
+                        box-sizing: border-box !important;
+                        gap: 8px !important;
+                    }
+                    .inventory-action-btns button {
+                        flex: 1 !important;
+                        width: auto !important;
+                        font-size: 14px !important;
+                        padding: 10px 0 !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 }

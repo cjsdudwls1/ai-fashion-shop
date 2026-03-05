@@ -498,7 +498,7 @@ export default function AdminPage() {
                             {/* Gender Selection */}
                             <div style={{ marginTop: '24px' }}>
                                 <label style={{ display: 'block', fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>성별 (Gender)</label>
-                                <div style={{ display: 'flex', gap: '16px' }}>
+                                <div className="admin-gender-group" style={{ display: 'flex', gap: '16px' }}>
                                     {[
                                         { value: 'female', label: '여성 (Female)' },
                                         { value: 'male', label: '남성 (Male)' },
@@ -806,7 +806,7 @@ export default function AdminPage() {
                                     </div>
 
                                     {/* Option 3: Quantity & Add */}
-                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginTop: '8px' }}>
+                                    <div className="admin-qty-add-row" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginTop: '8px' }}>
                                         <div style={{ width: '120px' }}>
                                             <label style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>수량 (Quantity)</label>
                                             <input
@@ -892,7 +892,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* Bottom Action Buttons */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px' }}>
+                    <div className="admin-bottom-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px' }}>
                         <button
                             type="button"
                             onClick={() => router.back()}
@@ -929,6 +929,32 @@ export default function AdminPage() {
                     </div>
                 </div>
             </div>
+
+            {/* 모바일 반응형 스타일 */}
+            <style jsx>{`
+                @media (max-width: 767px) {
+                    .admin-gender-group {
+                        flex-direction: column !important;
+                        gap: 10px !important;
+                    }
+                    .admin-qty-add-row {
+                        flex-direction: column !important;
+                        align-items: stretch !important;
+                    }
+                    .admin-qty-add-row > div {
+                        width: 100% !important;
+                    }
+                    .admin-qty-add-row .btn-primary {
+                        width: 100% !important;
+                    }
+                    .admin-bottom-actions {
+                        flex-direction: column-reverse !important;
+                    }
+                    .admin-bottom-actions button {
+                        width: 100% !important;
+                    }
+                }
+            `}</style>
         </div >
     );
 }

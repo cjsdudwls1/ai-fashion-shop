@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
     triggerVeoVideo,
     checkVeoVideo,
+    downloadVeoVideo,
 } from '@/lib/aiVideoService';
 import { uploadVideoToCloudinary } from '@/lib/cloudinaryUtils';
 
@@ -127,17 +128,8 @@ export async function GET(request: NextRequest) {
                         console.log(`[Sync Worker] Veo 영상 완료, Cloudinary 업로드 시작`);
 
                         try {
-                            // Google URI에서 영상 다운로드
-                            const videoResponse = await fetch(statusRes.videoUri, {
-                                headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY || '' },
-                                redirect: 'follow',
-                            });
-
-                            if (!videoResponse.ok) {
-                                throw new Error(`영상 다운로드 실패: HTTP ${videoResponse.status}`);
-                            }
-
-                            const arrayBuffer = await videoResponse.arrayBuffer();
+                            // 공식 SDK 패턴으로 영상 다운로드 (API 키를 쿼리 파라미터로 전달)
+                            const arrayBuffer = await downloadVeoVideo(statusRes.videoUri);
                             console.log(`[Sync Worker] 영상 다운로드 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
 
                             // Cloudinary에 업로드 → 영구 Public URL 획득

@@ -275,7 +275,9 @@ export async function uploadVideoToCloudinary(
     }
 
     const result = await response.json();
-    console.log(`[Cloudinary] 영상 업로드 성공: ${result.secure_url} (${Math.round(result.bytes / 1024)}KB)`);
+    // 오디오 포함 여부 로깅 (디버깅용)
+    const audioInfo = result.audio ? `audio: ${result.audio.codec}/${result.audio.frequency}Hz/${result.audio.channels}ch` : 'audio: NONE';
+    console.log(`[Cloudinary] 영상 업로드 성공: ${result.secure_url} (${Math.round(result.bytes / 1024)}KB, duration: ${result.duration}s, ${audioInfo})`);
     return result.secure_url;
 }
 

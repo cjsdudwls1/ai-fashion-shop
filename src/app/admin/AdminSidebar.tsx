@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export default function AdminSidebar() {
+interface AdminSidebarProps {
+    onNavigate?: () => void;
+}
+
+export default function AdminSidebar({ onNavigate }: AdminSidebarProps) {
     const pathname = usePathname();
 
     const menuItems = [
@@ -14,7 +18,7 @@ export default function AdminSidebar() {
     ];
 
     return (
-        <aside className="fixed top-[64px] left-0 w-[280px] h-[calc(100vh-64px)] bg-gray-50 dark:bg-[#0D0D0D] border-r border-gray-200 dark:border-gray-800 z-40 overflow-y-auto">
+        <aside className="w-full h-full bg-gray-50 dark:bg-[#0D0D0D] border-r border-gray-200 dark:border-gray-800 overflow-y-auto">
             <div className="py-8">
                 <div className="mb-8 px-8">
                     <h2 className="text-[14px] font-bold text-gray-400 dark:text-gray-300 uppercase tracking-[0.2em]">관리자 메뉴</h2>
@@ -26,6 +30,7 @@ export default function AdminSidebar() {
                             <Link
                                 key={item.path}
                                 href={item.path}
+                                onClick={() => onNavigate?.()}
                                 className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-medium text-[19px] relative overflow-hidden group ${isActive
                                     ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold shadow-sm'
                                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1A1A1A] hover:text-gray-900 dark:hover:text-white'
