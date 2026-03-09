@@ -1,78 +1,41 @@
-import { GoogleGenAI } from '@google/genai';
+import { ai } from './genaiClient';
+import { Modality } from '@google/genai';
+import { getCategoryEnglish, isClothingCategory } from './constants';
+import { fetchImageAsBase64, extractImageFromResponse } from './mediaUtils';
 import type { Gender } from './types';
 
-const GOOGLE_API_KEY = process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
-const VEO_MODEL = 'gemini-3.1-flash-image-preview';
+// Gemini 이미지 생성 모델
+const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
-const CATEGORY_MAP: Record<string, string> = {
-    'short-sleeve': 'short-sleeve T-shirt',
-    'long-sleeve': 'long-sleeve T-shirt',
-    'sleeveless': 'sleeveless top',
-    'shirt': 'shirt',
-    'knit': 'knit sweater',
-    'hoodie': 'hoodie',
-    'pants': 'pants',
-    'shorts': 'shorts',
-    'skirt': 'skirt',
-    'denim': 'denim jeans',
-    'slacks': 'slacks',
-    'jacket': 'jacket',
-    'coat': 'coat',
-    'padding': 'padded jacket',
-    'cardigan': 'cardigan',
-    'onepiece': 'one-piece dress',
-    'set': 'coordinated set',
-    'underwear': 'underwear',
-    'etc': 'fashion item',
-};
+// [2026-03-05] withRetry 함수 제거
+// 사유: ECONNRESET 등 지속적 네트워크 불안정 시 1~2초 간격의 즉시 재시도는
+// 성공 확률이 극히 낮으면서 유료 API 과금만 3배로 증폭시켰음.
+// 상위 레벨의 sync 폴링(15초 간격)이 이미 재시도 역할을 수행하므로,
+// withRetry 제거 후에도 최종 성공률에는 변동이 없음.
+// 근거: .docs/api-cost-overrun-analysis.md 해결책 A
 
-async function fetchImageAsBase64(imageUrl: string): Promise<{ imageBytes: string; mimeType: string } | null> {
+// [2026-03-06] 그룹 D 리팩토링: 공통 generateImage() 내부 함수 추출
+// 사유: generateTryOnImage과 generateCleanProductImage의 구조가 90% 동일
+// (이미지 다운로드 → 프롬프트 생성 → AI 호출 → 응답 파싱)하여 중복 제거
+// 근거: .docs/refactoring-group-d-ai-service.md — Template Method 패턴
+type ImageResult = { success: boolean; imageBuffer?: Buffer; error?: string };
+
+/** 공통 이미지 생성 파이프라인: 참조 이미지 + 프롬프트 → AI 생성 → 결과 반환 */
+async function generateImage(
+    prompt: string,
+    imageUrl: string,
+    logPrefix: string
+): Promise<ImageResult> {
     try {
-        console.log(`[AI Image] 참조 이미지 다운로드: ${imageUrl.substring(0, 80)}...`);
-        const response = await fetch(imageUrl, { redirect: 'follow' });
-
-        if (!response.ok) {
-            console.warn(`[AI Image] 이미지 다운로드 실패: HTTP ${response.status}`);
-            return null;
-        }
-
-        const contentType = response.headers.get('content-type') || 'image/jpeg';
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-
-        let mimeType = contentType.split(';')[0].trim();
-        if (!mimeType.startsWith('image/')) {
-            mimeType = 'image/jpeg';
-        }
-
-        console.log(`[AI Image] 참조 이미지 준비 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB, ${mimeType})`);
-        return { imageBytes: base64, mimeType };
-    } catch (error) {
-        console.warn(`[AI Image] 참조 이미지 다운로드 오류:`, error);
-        return null;
-    }
-}
-
-export async function generateTryOnImage(
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string },
-    imageUrl: string
-): Promise<{ success: boolean; imageBuffer?: Buffer; error?: string }> {
-    try {
-        const referenceImageData = await fetchImageAsBase64(imageUrl);
+        const referenceImageData = await fetchImageAsBase64(imageUrl, logPrefix);
         if (!referenceImageData) {
             return { success: false, error: '참조 이미지를 다운로드할 수 없습니다.' };
         }
 
-        const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
-        const categoryStr = (productInfo.category && CATEGORY_MAP[productInfo.category]) || 'fashion item';
-
-        const prompt = `A highly realistic, professional fashion lookbook photo. A beautiful ${genderStr} model wearing the exact garment shown in the reference image: "${productInfo.name}", made of ${productInfo.fabric}. The model must wear this specific ${categoryStr}, preserving the exact color, pattern, and design details from the reference image. The model is standing confidently in a modern minimalist studio with soft, flattering lighting, posing naturally. Extremely detailed, photorealistic.`;
-
-        console.log(`[AI Image] 이미지 생성 요청 시작`);
+        console.log(`${logPrefix} 이미지 생성 요청 시작`);
 
         const response = await ai.models.generateContent({
-            model: VEO_MODEL,
+            model: IMAGE_MODEL,
             contents: [
                 prompt,
                 {
@@ -83,32 +46,66 @@ export async function generateTryOnImage(
                 }
             ],
             config: {
-                // @ts-ignore
-                responseModalities: ['IMAGE'],
+                responseModalities: [Modality.IMAGE],
                 imageConfig: {
                     aspectRatio: '3:4',
-                    imageSize: '1K'
+                    imageSize: '2K'
                 }
             }
         });
 
-        const parts = response.candidates?.[0]?.content?.parts;
-        if (!parts) {
-            return { success: false, error: 'API 응답에서 생성된 콘텐츠를 찾을 수 없습니다.' };
-        }
-
-        for (const part of parts) {
-            if (part.inlineData && part.inlineData.data) {
-                const buffer = Buffer.from(part.inlineData.data, "base64");
-                console.log(`[AI Image] 이미지 생성 성공!`);
-                return { success: true, imageBuffer: buffer };
-            }
+        const imageBuffer = extractImageFromResponse(response);
+        if (imageBuffer) {
+            console.log(`${logPrefix} 이미지 생성 성공!`);
+            return { success: true, imageBuffer };
         }
 
         return { success: false, error: 'API 응답에서 이미지 데이터를 찾을 수 없습니다.' };
 
     } catch (error) {
-        console.error('[AI Image] 생성 오류:', error);
+        console.error(`${logPrefix} 생성 오류:`, error);
         return { success: false, error: String(error) };
     }
+}
+
+export async function generateTryOnImage(
+    productInfo: { name: string; fabric: string; gender: Gender; category?: string },
+    imageUrl: string
+): Promise<ImageResult> {
+    const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
+    const categoryStr = getCategoryEnglish(productInfo.category || '');
+
+    // [2026-03-05] 의류/비의류 프롬프트 분기
+    // 사유: 주얼리/액세서리는 "garment(의복)" 프롬프트가 부적합하므로,
+    // 카테고리별로 최적화된 프롬프트를 사용하여 AI 결과물 품질을 개선한다.
+    // 근거: .docs/jewelry-category-unsupported-analysis.md 해결책 B-2
+    const isClothing = isClothingCategory(productInfo.category || '');
+
+    const prompt = isClothing
+        ? `A highly realistic, professional fashion lookbook photo. A beautiful ${genderStr} model wearing the exact garment shown in the reference image: "${productInfo.name}", made of ${productInfo.fabric}. The model must wear this specific ${categoryStr}, preserving the exact color, pattern, and design details from the reference image. The model is standing confidently in a modern minimalist studio with soft, flattering lighting, posing naturally. Extremely detailed, photorealistic.`
+        : `A highly realistic, professional product showcase photo. A beautiful ${genderStr} model elegantly showcasing the ${categoryStr} shown in the reference image: "${productInfo.name}", made of ${productInfo.fabric}. The ${categoryStr} is the focal point of the image, captured in a close-up detail shot. The model holds or wears the ${categoryStr} naturally, with soft studio lighting emphasizing the material's texture, shine, and craftsmanship. Modern minimalist background. Extremely detailed, photorealistic.`;
+
+    return generateImage(prompt, imageUrl, '[AI Image]');
+}
+
+/**
+ * 원본 상품 사진의 배경을 프로페셔널한 스튜디오 배경으로 교체한 이미지를 생성한다.
+ * 상품 자체의 색상, 패턴, 디테일은 정확히 보존하면서 배경만 교체한다.
+ */
+export async function generateCleanProductImage(
+    imageUrl: string,
+    productInfo: { name: string; category?: string }
+): Promise<ImageResult> {
+    const categoryStr = getCategoryEnglish(productInfo.category || '');
+
+    // [2026-03-05] 의류/비의류 프롬프트 분기
+    // 사유: 비의류 상품에 "garment" 용어를 사용하면 AI가 옷으로 해석할 수 있음.
+    // 근거: .docs/jewelry-category-unsupported-analysis.md 해결책 B-3
+    const isClothing = isClothingCategory(productInfo.category || '');
+
+    const prompt = isClothing
+        ? `Take this ${categoryStr} garment photo and enhance it into a professional e-commerce product image. Remove the original background completely and place the garment on a clean, minimalist white/light gray studio background with soft, even lighting and subtle natural shadows. Keep the exact garment details: preserve all colors, patterns, textures, stitching, and design elements precisely as they appear. The result should look like a high-end fashion brand's official product photo. Professional studio photography style, clean composition, high resolution.`
+        : `Take this ${categoryStr} product photo and enhance it into a professional e-commerce product image. Remove the original background completely and place the ${categoryStr} on a clean, elegant display surface with a minimalist white/light gray studio background. Use soft, even lighting with subtle reflections to highlight the material's texture, finish, and fine details. The result should look like a high-end jewelry/accessories brand's official product photo. Professional studio photography style, macro detail emphasis, high resolution.`;
+
+    return generateImage(prompt, imageUrl, '[AI Image]');
 }

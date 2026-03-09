@@ -1,50 +1,24 @@
 // AI 동영상 생성 서비스 - Google Veo 3.1 Fast
 // 워크플로우: 상품 이미지 참조 + 텍스트 프롬프트 → 동영상+오디오 생성
 
-import { GoogleGenAI } from '@google/genai';
-import { productStore } from './productStore';
-import { supabaseAdmin } from './supabaseAdmin';
+import { ai } from './genaiClient';
+import { GenerateVideosOperation } from '@google/genai';
+import { getCategoryEnglish, isClothingCategory } from './constants';
+import { fetchImageAsBase64 } from './mediaUtils';
 import type { Gender } from './types';
 
 // ============================================================================
-// Google Veo 3.1 Fast API 설정
+// Veo 모델 및 기본 설정
 // ============================================================================
 
-const GOOGLE_API_KEY = process.env.GEMINI_API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
-
-// Veo 모델 및 기본 설정
 const VEO_MODEL = 'veo-3.1-fast-generate-preview';
-const VEO_RESOLUTION = '720p'; // Veo 3.1 Fast는 720p만 지원
-const VEO_DURATION = 8; // Veo는 4, 6, 8초만 지원 (7초에 가장 가까운 값)
+const VEO_RESOLUTION = '1080p'; // Veo 3.1 Fast / Veo 3.1 모두 1080p 지원
+const VEO_DURATION = 8; // Veo는 4, 6, 8초만 지원
 const VEO_ASPECT_RATIO = '16:9';
 
 // ============================================================================
 // 프롬프트 생성 유틸리티
 // ============================================================================
-
-const CATEGORY_MAP: Record<string, string> = {
-    'short-sleeve': 'short-sleeve T-shirt',
-    'long-sleeve': 'long-sleeve T-shirt',
-    'sleeveless': 'sleeveless top',
-    'shirt': 'shirt',
-    'knit': 'knit sweater',
-    'hoodie': 'hoodie',
-    'pants': 'pants',
-    'shorts': 'shorts',
-    'skirt': 'skirt',
-    'denim': 'denim jeans',
-    'slacks': 'slacks',
-    'jacket': 'jacket',
-    'coat': 'coat',
-    'padding': 'padded jacket',
-    'cardigan': 'cardigan',
-    'onepiece': 'one-piece dress',
-    'set': 'coordinated set',
-    'underwear': 'underwear',
-    'etc': 'fashion item',
-};
 
 function buildVideoPrompt(productInfo: {
     name: string;
@@ -55,51 +29,32 @@ function buildVideoPrompt(productInfo: {
     narrationText?: string;
 }): string {
     const genderStr = productInfo.gender === 'female' ? 'female' : 'male';
-    const categoryStr = (productInfo.category && CATEGORY_MAP[productInfo.category]) || 'fashion item';
+    const categoryStr = getCategoryEnglish(productInfo.category || '');
 
     // 나레이션 대사 결정: 사용자 입력이 있으면 사용, 없으면 자동 생성
     const narration = productInfo.narrationText
         ? productInfo.narrationText
         : `${productInfo.name}. ${productInfo.fabric} 소재의 프리미엄 ${categoryStr}입니다.`;
 
+    // [2026-03-05] 의류/비의류 프롬프트 분기
+    // 사유: 주얼리/액세서리는 모델이 걷는 장면보다 클로즈업 회전/디테일 촬영이 자연스러움.
+    // Veo 공식 가이드의 Subject/Action/Camera 구조에 맞춰 분기 처리.
+    // 근거: .docs/jewelry-category-unsupported-analysis.md 해결책 B-4
+    const isClothing = isClothingCategory(productInfo.category || '');
+
     if (productInfo.hasReferenceImage) {
-        // 참조 이미지가 있을 때: 이미지 속 옷을 정확히 재현하도록 유도
-        return `A high-end fashion commercial video. A professional ${genderStr} model wearing the exact garment shown in the reference image - "${productInfo.name}", made of ${productInfo.fabric}. The model must wear this specific ${categoryStr} from the reference image, preserving the exact color, pattern, and design details. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video.`;
+        // 참조 이미지가 있을 때
+        if (isClothing) {
+            return `A high-end fashion commercial video. A professional ${genderStr} model wearing the exact garment shown in the reference image - "${productInfo.name}", made of ${productInfo.fabric}. The model must wear this specific ${categoryStr} from the reference image, preserving the exact color, pattern, and design details. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video. Do not render any text, titles, subtitles, or watermarks on screen.`;
+        }
+        return `A high-end product commercial video showcasing "${productInfo.name}", a premium ${productInfo.fabric} ${categoryStr} shown in the reference image. The ${categoryStr} is displayed on an elegant surface or held by a ${genderStr} model's hands. Camera slowly orbits around the ${categoryStr} with extreme close-up detail shots, capturing the texture, shine, and craftsmanship. Soft cinematic lighting with subtle reflections. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional product video. Do not render any text, titles, subtitles, or watermarks on screen.`;
     }
 
-    // 참조 이미지가 없을 때: 기존 텍스트 전용 프롬프트
-    return `A high-end fashion commercial video. A professional ${genderStr} model wearing "${productInfo.name}", a premium ${productInfo.fabric} ${categoryStr}. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video.`;
-}
-
-// ============================================================================
-// 이미지 URL → Base64 변환 유틸리티
-// ============================================================================
-async function fetchImageAsBase64(imageUrl: string): Promise<{ imageBytes: string; mimeType: string } | null> {
-    try {
-        console.log(`[Veo] 참조 이미지 다운로드: ${imageUrl.substring(0, 80)}...`);
-        const response = await fetch(imageUrl, { redirect: 'follow' });
-
-        if (!response.ok) {
-            console.warn(`[Veo] 이미지 다운로드 실패: HTTP ${response.status}`);
-            return null;
-        }
-
-        const contentType = response.headers.get('content-type') || 'image/jpeg';
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-
-        // MIME 타입 정규화
-        let mimeType = contentType.split(';')[0].trim();
-        if (!mimeType.startsWith('image/')) {
-            mimeType = 'image/jpeg';
-        }
-
-        console.log(`[Veo] 참조 이미지 준비 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB, ${mimeType})`);
-        return { imageBytes: base64, mimeType };
-    } catch (error) {
-        console.warn(`[Veo] 참조 이미지 다운로드 오류:`, error);
-        return null;
+    // 참조 이미지가 없을 때: 텍스트 전용 프롬프트
+    if (isClothing) {
+        return `A high-end fashion commercial video. A professional ${genderStr} model wearing "${productInfo.name}", a premium ${productInfo.fabric} ${categoryStr}. The model walks confidently in a modern minimalist studio with soft cinematic lighting, turns to show the garment details, and poses elegantly. Camera slowly orbits around the model. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional fashion video. Do not render any text, titles, subtitles, or watermarks on screen.`;
     }
+    return `A high-end product commercial video showcasing "${productInfo.name}", a premium ${productInfo.fabric} ${categoryStr}. The ${categoryStr} is displayed on an elegant surface or held by a ${genderStr} model's hands. Camera slowly orbits around the ${categoryStr} with extreme close-up detail shots, capturing the texture, shine, and craftsmanship. Soft cinematic lighting with subtle reflections. The narrator says in Korean: "${narration}" Soft ambient background music plays. Ultra high quality, cinematic, 4K look, professional product video. Do not render any text, titles, subtitles, or watermarks on screen.`;
 }
 
 // ============================================================================
@@ -114,7 +69,7 @@ export async function triggerVeoVideo(
         // 참조 이미지 준비
         let referenceImageData: { imageBytes: string; mimeType: string } | null = null;
         if (imageUrl) {
-            referenceImageData = await fetchImageAsBase64(imageUrl);
+            referenceImageData = await fetchImageAsBase64(imageUrl, '[Veo]');
         }
 
         const prompt = buildVideoPrompt({
@@ -130,6 +85,7 @@ export async function triggerVeoVideo(
         console.log(`[Veo] 프롬프트: ${prompt.substring(0, 120)}...`);
 
         // Veo API 호출 옵션 구성
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const generateOptions: any = {
             model: targetModel,
             prompt: prompt,
@@ -144,7 +100,7 @@ export async function triggerVeoVideo(
 
         // 참조 이미지가 있으면 referenceImages로 전달 (상품 외형 보존)
         if (referenceImageData) {
-            generateOptions.config.referenceImages = [
+            (generateOptions.config as Record<string, unknown>).referenceImages = [
                 {
                     image: {
                         imageBytes: referenceImageData.imageBytes,
@@ -159,7 +115,10 @@ export async function triggerVeoVideo(
         const operation = await ai.models.generateVideos(generateOptions);
 
         // operation.name이 폴링에 필요한 고유 식별자
-        const operationName = (operation as any).name;
+        // DB에 operation name 문자열만 저장하므로, 폴링 시 GenerateVideosOperation 인스턴스를
+        // 재구성하여 SDK의 getVideosOperation()에 전달한다.
+        // 근거: .docs/veo-polling-fromAPIResponse-solution.md
+        const operationName = (operation as { name?: string }).name;
         if (!operationName) {
             console.error('[Veo] operation name 없음:', JSON.stringify(operation));
             return { success: false, error: 'Operation name을 받지 못했습니다.' };
@@ -174,7 +133,13 @@ export async function triggerVeoVideo(
 }
 
 // ============================================================================
-// Veo 영상 생성 상태 확인 (SDK 기반 폴링)
+// [2026-03-06] SDK 공식 메서드 전환
+// 이전: REST API 직접 호출 + API 키 수동 주입 (veoFetch 헬퍼)
+// 이후: ai.operations.getVideosOperation() — SDK 내부 인증/에러 처리 활용
+// 사유: REST 직접 호출이 generativelanguage.googleapis.com에 대한 API 호출로
+//       집계되어 과금 폭증의 주범이었음. SDK 공식 메서드는 operation 조회를
+//       내부적으로 최적화하여 불필요한 과금을 방지한다.
+// 근거: https://ai.google.dev/gemini-api/docs/video#handling-asynchronous-operations
 // ============================================================================
 export async function checkVeoVideo(operationName: string): Promise<{
     status: 'running' | 'succeed' | 'failed';
@@ -182,30 +147,23 @@ export async function checkVeoVideo(operationName: string): Promise<{
     error?: string;
 }> {
     try {
-        // REST API를 직접 호출하여 operation 상태 조회
-        // (SDK의 getVideosOperation은 generateVideos()에서 반환된 전체 객체가 필요하므로,
-        //  operation name 문자열만으로는 사용 불가)
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${GOOGLE_API_KEY}`;
-        const response = await fetch(apiUrl);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[Veo] 폴링 API 오류 (HTTP ${response.status}):`, errorText);
-            return { status: 'running', error: `HTTP ${response.status}: ${errorText}` };
-        }
-
-        const operation = await response.json();
+        // [2026-03-08] GenerateVideosOperation 인스턴스 복원
+        // SDK의 getVideosOperation()은 _fromAPIResponse() 메서드를 가진
+        // 클래스 인스턴스를 요구한다. DB에는 operationName 문자열만 저장하므로
+        // 빈 인스턴스를 생성하고 name만 설정하여 전달한다.
+        // 근거: .docs/veo-polling-fromAPIResponse-solution.md
+        const operationRef = new GenerateVideosOperation();
+        operationRef.name = operationName;
+        const operation = await ai.operations.getVideosOperation({
+            operation: operationRef,
+        });
 
         if (operation.done) {
-            // REST API 응답 구조: response.generateVideoResponse.generatedSamples[].video.uri
-            // SDK 응답 구조:     response.generatedVideos[].video.uri
-            // 두 구조 모두 호환하도록 처리
-            const restSamples = operation.response?.generateVideoResponse?.generatedSamples;
-            const sdkVideos = operation.response?.generatedVideos;
-            const samples = restSamples || sdkVideos;
+            // SDK 응답 구조: response.generatedVideos[].video.uri
+            const videos = operation.response?.generatedVideos;
 
-            if (samples && samples.length > 0) {
-                const videoUri = samples[0].video?.uri;
+            if (videos && videos.length > 0) {
+                const videoUri = videos[0].video?.uri;
                 if (videoUri) {
                     console.log(`[Veo] 영상 생성 완료! URI: ${videoUri.substring(0, 80)}...`);
                     return { status: 'succeed', videoUri };
@@ -213,9 +171,9 @@ export async function checkVeoVideo(operationName: string): Promise<{
             }
 
             // 에러로 완료된 경우 또는 응답 구조가 예상과 다른 경우
-            const errorMsg = operation.error?.message || '영상 URI를 찾을 수 없습니다.';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const errorMsg = (operation as any).error?.message || '영상 URI를 찾을 수 없습니다.';
             console.error(`[Veo] 영상 생성 실패:`, errorMsg);
-            console.error(`[Veo] 응답 구조 디버그:`, JSON.stringify(operation.response || {}).substring(0, 500));
             return { status: 'failed', error: errorMsg };
         }
 
@@ -223,23 +181,30 @@ export async function checkVeoVideo(operationName: string): Promise<{
         console.log(`[Veo] 영상 생성 진행 중...`);
         return { status: 'running' };
     } catch (error) {
+        // 네트워크 예외도 'failed'로 반환하여 에러 마스킹 제거
         console.error('[Veo] 폴링 오류:', error);
-        return { status: 'running', error: String(error) };
+        return { status: 'failed', error: String(error) };
     }
 }
 
 // ============================================================================
 // Veo 영상 다운로드 (ArrayBuffer 반환)
-// URI에 API 키를 쿼리 파라미터로 전달하는 공식 패턴 사용
+// SDK 응답의 videoUri를 사용하여 다운로드
 // ============================================================================
 export async function downloadVeoVideo(videoUri: string): Promise<ArrayBuffer> {
-    // 공식 패턴: URI에 API 키를 쿼리 파라미터로 전달
-    const separator = videoUri.includes('?') ? '&' : '?';
-    const downloadUrl = `${videoUri}${separator}key=${GOOGLE_API_KEY}`;
-
     console.log(`[Veo] 영상 다운로드 시작: ${videoUri.substring(0, 80)}...`);
 
-    const response = await fetch(downloadUrl, { redirect: 'follow' });
+    // SDK에서 반환된 videoUri는 인증 토큰이 포함된 서명된 URL이거나,
+    // API 키를 쿼리 파라미터로 추가해야 하는 URL일 수 있음.
+    // 먼저 서명된 URL로 시도하고, 실패 시 API 키를 추가하여 재시도.
+    let response = await fetch(videoUri, { redirect: 'follow' });
+
+    if (!response.ok && response.status === 403) {
+        // 인증 필요: API 키 추가
+        const apiKey = process.env.GEMINI_API_KEY || '';
+        const separator = videoUri.includes('?') ? '&' : '?';
+        response = await fetch(`${videoUri}${separator}key=${apiKey}`, { redirect: 'follow' });
+    }
 
     if (!response.ok) {
         throw new Error(`영상 다운로드 실패: HTTP ${response.status}`);
@@ -252,49 +217,4 @@ export async function downloadVeoVideo(videoUri: string): Promise<ArrayBuffer> {
     console.log(`[Veo] 영상 다운로드 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
 
     return arrayBuffer;
-}
-
-// ============================================================================
-// 통합 함수 - Veo 트리거만 실행 (서버리스 타임아웃 호환)
-// 실제 폴링과 다운로드는 sync/route.ts Cron Worker에서 처리
-// ============================================================================
-export async function generateProductVideo(
-    productId: string,
-    imageBase64OrUrl: string,
-    productInfo: { name: string; fabric: string; gender: Gender; category?: string; narrationText?: string; videoModel?: string | null }
-): Promise<void> {
-    console.log(`[Veo Service] 영상 생성 트리거: ${productId} - ${productInfo.name}`);
-
-    try {
-        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, undefined, undefined, supabaseAdmin);
-
-        // Veo 영상 생성 트리거 (API 호출 1회, 즉시 반환) - 이미지 참조 포함
-        const triggerResult = await triggerVeoVideo(productInfo, imageBase64OrUrl);
-
-        if (!triggerResult.success || !triggerResult.operationName) {
-            const errorMsg = triggerResult.error || '영상 생성 트리거 실패';
-            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, undefined, undefined, supabaseAdmin);
-            throw new Error(errorMsg);
-        }
-
-        // Operation name 저장 후 즉시 반환 (폴링은 sync/route.ts에서)
-        await productStore.updateVideoStatus(productId, 'generating', undefined, undefined, undefined, triggerResult.operationName, undefined, supabaseAdmin);
-        console.log(`[Veo Service] 트리거 완료, 폴링은 Sync Worker에 위임: ${triggerResult.operationName}`);
-
-    } catch (error) {
-        const product = await productStore.getProduct(productId);
-        if (product && product.videoStatus === 'generating') {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            await productStore.updateVideoStatus(productId, 'failed', undefined, undefined, errorMsg, undefined, undefined, supabaseAdmin);
-        }
-        console.error(`[Veo Service] 트리거 오류:`, error);
-        throw error;
-    }
-}
-
-// ============================================================================
-// 현재 설정된 서비스 정보
-// ============================================================================
-export function getAIServiceInfo(): { service: string; configured: boolean } {
-    return { service: 'veo-3.1-fast', configured: !!GOOGLE_API_KEY };
 }

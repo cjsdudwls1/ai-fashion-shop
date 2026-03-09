@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser, isAdminUser } from '@/lib/authUtils';
-import AdminVideoSyncer from './AdminVideoSyncer';
 import AdminLayoutClient from './AdminLayoutClient';
 
 export default async function AdminLayout({
@@ -22,7 +21,6 @@ export default async function AdminLayout({
     return (
         <div className="flex bg-[var(--bg-main)] min-h-screen">
             <AdminLayoutClient>
-                <AdminVideoSyncer />
                 {children}
             </AdminLayoutClient>
         </div>

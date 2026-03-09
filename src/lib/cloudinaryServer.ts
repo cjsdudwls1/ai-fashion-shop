@@ -45,6 +45,7 @@ export function extractCloudinaryUrls(product: {
     gallery_images?: Array<{ url?: string }> | null;
     video_url?: string | null;
     tryon_image_url?: string | null;
+    display_image_url?: string | null;
 }): string[] {
     const urls: string[] = [];
 
@@ -61,6 +62,11 @@ export function extractCloudinaryUrls(product: {
     // AI 피팅 이미지
     if (product.tryon_image_url && product.tryon_image_url.includes('res.cloudinary.com')) {
         urls.push(product.tryon_image_url);
+    }
+
+    // AI 생성 소비자용 대표 이미지
+    if (product.display_image_url && product.display_image_url.includes('res.cloudinary.com')) {
+        urls.push(product.display_image_url);
     }
 
     // 갤러리 이미지
@@ -139,6 +145,10 @@ async function deleteFromCloudinary(publicId: string, resourceType: 'image' | 'v
         if (result.result === 'ok') {
             console.log(`[Cloudinary] ${resourceType} 삭제 성공: ${publicId}`);
             return true;
+        } else if (result.result === 'not found') {
+            // Cloudinary Destroy API: 이미 삭제된 리소스는 'not found' 반환 (정상 응답, 멱등성 보장)
+            console.log(`[Cloudinary] ${resourceType} 이미 삭제됨 (skip): ${publicId}`);
+            return true;
         } else {
             console.warn(`[Cloudinary] ${resourceType} 삭제 실패: ${publicId}`, result);
             return false;
@@ -181,14 +191,14 @@ export async function deleteCloudinaryImages(urls: string[]): Promise<void> {
 // ============================================================================
 
 /**
- * ArrayBuffer를 Cloudinary에 이미지로 업로드합니다.
- * Signed Upload 방식 (API Key + Secret + SHA-1 서명)
- * 반환: Public URL (영구 접근 가능)
+ * Signed Upload에 필요한 서명 및 공통 FormData 필드를 생성하는 내부 헬퍼.
+ * API Key 검증, timestamp 생성, SHA-1 서명 생성을 한 곳에서 처리한다.
  */
-export async function uploadImageToCloudinary(
-    buffer: ArrayBuffer | Buffer,
-    productId: string
-): Promise<string> {
+async function buildSignedUpload(folder: string, publicId: string): Promise<{
+    timestamp: string;
+    apiKey: string;
+    signature: string;
+}> {
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
@@ -197,14 +207,27 @@ export async function uploadImageToCloudinary(
     }
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const folder = 'ai_tryon_images';
-    const publicId = `${folder}/${productId}_ai_tryon_${Date.now()}`;
-
-    // 서명 생성 (Cloudinary Signed Upload 규칙)
     const stringToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
     const signature = await sha1(stringToSign);
 
-    // FormData 구성
+    return { timestamp, apiKey, signature };
+}
+
+/**
+ * ArrayBuffer를 Cloudinary에 이미지로 업로드한다.
+ * Signed Upload 방식 (API Key + Secret + SHA-1 서명)
+ * 반환: Public URL (영구 접근 가능)
+ */
+export async function uploadImageToCloudinary(
+    buffer: ArrayBuffer | Buffer,
+    productId: string
+): Promise<string> {
+    const folder = 'ai_tryon_images';
+    // folder 파라미터가 자동으로 경로 앞에 붙으므로, publicId에는 folder 접두사를 포함하지 않는다
+    // (Cloudinary Upload API 공식 사양: folder는 public_id 앞에 자동 결합)
+    const publicId = `${productId}_ai_tryon_${Date.now()}`;
+    const { timestamp, apiKey, signature } = await buildSignedUpload(folder, publicId);
+
     const blob = new Blob([new Uint8Array(buffer)], { type: 'image/jpeg' });
     const formData = new FormData();
     formData.append('file', blob, `${productId}_tryon.jpg`);
@@ -230,7 +253,7 @@ export async function uploadImageToCloudinary(
 }
 
 /**
- * ArrayBuffer를 Cloudinary에 영상으로 업로드합니다.
+ * ArrayBuffer를 Cloudinary에 영상으로 업로드한다.
  * Signed Upload 방식 (API Key + Secret + SHA-1 서명)
  * 반환: Public URL (영구 접근 가능)
  */
@@ -238,22 +261,11 @@ export async function uploadVideoToCloudinary(
     buffer: ArrayBuffer,
     productId: string
 ): Promise<string> {
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-    if (!apiKey || !apiSecret) {
-        throw new Error('[Cloudinary] API_KEY 또는 API_SECRET이 설정되지 않았습니다.');
-    }
-
-    const timestamp = Math.floor(Date.now() / 1000).toString();
     const folder = 'product_videos';
-    const publicId = `${folder}/${productId}_${Date.now()}`;
+    // folder 파라미터가 자동으로 경로 앞에 붙으므로, publicId에는 folder 접두사를 포함하지 않는다
+    const publicId = `${productId}_${Date.now()}`;
+    const { timestamp, apiKey, signature } = await buildSignedUpload(folder, publicId);
 
-    // 서명 생성 (Cloudinary Signed Upload 규칙)
-    const stringToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
-    const signature = await sha1(stringToSign);
-
-    // FormData 구성
     const blob = new Blob([buffer], { type: 'video/mp4' });
     const formData = new FormData();
     formData.append('file', blob, `${productId}.mp4`);

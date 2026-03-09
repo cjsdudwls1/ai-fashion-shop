@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { ORDER_STATUSES } from '@/lib/orderUtils';
 
 // PATCH: 주문 상태 변경 (관리자 전용)
 export async function PATCH(
@@ -15,8 +16,8 @@ export async function PATCH(
             return NextResponse.json({ error: '주문 ID가 필요합니다.' }, { status: 400 });
         }
 
-        const validStatuses = ['pending_payment', 'payment_confirming', 'paid', 'shipped', 'delivered', 'cancelled'];
-        if (!validStatuses.includes(status)) {
+        // [2026-03-06] 그룹 F: validStatuses 하드코딩 → ORDER_STATUSES 상수 import
+        if (!ORDER_STATUSES.includes(status)) {
             return NextResponse.json({ error: '유효하지 않은 상태입니다.' }, { status: 400 });
         }
 

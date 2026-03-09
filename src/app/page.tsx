@@ -1,9 +1,6 @@
 'use client';
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import Image from "next/image";
 
 export default function HomePage() {
   return (

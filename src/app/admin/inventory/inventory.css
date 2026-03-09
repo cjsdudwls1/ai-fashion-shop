@@ -1,0 +1,94 @@
+/* inventory.css — 인라인 스타일 → CSS 클래스 전환 */
+
+/* ProductRow hover 효과 */
+.inventory-product-row {
+    transition: box-shadow 0.2s;
+}
+
+.inventory-product-row:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 재고 수정 버튼 hover */
+.inventory-edit-btn:hover {
+    opacity: 0.85;
+}
+
+/* 삭제 버튼 hover */
+.inventory-delete-btn:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 767px) {
+    .inventory-table-header {
+        display: none !important;
+    }
+
+    .inventory-product-row {
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .inventory-product-info {
+        padding: 16px !important;
+        gap: 12px !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    .inventory-product-name {
+        font-size: 16px !important;
+    }
+
+    .inventory-product-price {
+        font-size: 15px !important;
+    }
+
+    .inventory-product-id {
+        font-size: 12px !important;
+        max-width: 180px !important;
+    }
+
+    .inventory-sku-list {
+        padding: 12px 16px !important;
+        min-width: 0 !important;
+        gap: 6px !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    .inventory-sku-item {
+        font-size: 14px !important;
+        padding: 8px 12px !important;
+    }
+
+    .inventory-total-stock {
+        padding: 12px 16px !important;
+        align-items: stretch !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    .inventory-total-stock-inner {
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        padding: 10px 14px !important;
+    }
+
+    .inventory-action-btns {
+        flex-direction: row !important;
+        padding: 12px 16px !important;
+        padding-left: 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        gap: 8px !important;
+    }
+
+    .inventory-action-btns button {
+        flex: 1 !important;
+        width: auto !important;
+        font-size: 14px !important;
+        padding: 10px 0 !important;
+    }
+}

@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-
-interface ShippingInfo {
-    name: string;
-    phone: string;
-    zonecode: string;
-    roadAddress: string;
-    detailAddress: string;
-    memo: string;
-}
+import { ShippingInfo } from '@/types/order';
 
 interface ShippingFormProps {
     shippingInfo: ShippingInfo;
@@ -45,10 +37,10 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
     return (
         <section className="checkout-section">
             <h2 className="checkout-section-title">배송지 정보</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="flex flex-col gap-5">
                 {/* 받는 분 */}
                 <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    <label className="block text-[14px] font-medium text-[var(--text-secondary)] mb-2">
                         받는 분
                     </label>
                     <input
@@ -67,7 +59,7 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
 
                 {/* 연락처 */}
                 <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    <label className="block text-[14px] font-medium text-[var(--text-secondary)] mb-2">
                         연락처
                     </label>
                     <input
@@ -86,38 +78,22 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
 
                 {/* 주소 */}
                 <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    <label className="block text-[14px] font-medium text-[var(--text-secondary)] mb-2">
                         주소
                     </label>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                    <div className="flex gap-3 mb-3">
                         <input
                             type="text"
                             readOnly
                             placeholder="우편번호"
-                            className="checkout-input"
-                            style={{ width: '120px', flexShrink: 0, cursor: 'pointer', textAlign: 'center' }}
+                            className="checkout-input w-[120px] flex-shrink-0 cursor-pointer text-center"
                             value={shippingInfo.zonecode}
                             onClick={() => setOpenPostcode(true)}
                         />
                         <button
                             type="button"
                             onClick={() => setOpenPostcode(true)}
-                            style={{
-                                flex: 1,
-                                height: '48px',
-                                whiteSpace: 'nowrap',
-                                background: 'var(--text-primary)',
-                                color: 'var(--bg-dark)',
-                                padding: '0 20px',
-                                borderRadius: 'var(--radius-md)',
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'opacity 0.2s',
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-                            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                            className="flex-1 h-[48px] whitespace-nowrap bg-[var(--text-primary)] text-[var(--bg-dark)] px-5 rounded-[var(--radius-md)] text-[14px] font-bold border-none cursor-pointer transition-opacity duration-200 hover:opacity-90"
                         >
                             주소 검색
                         </button>
@@ -126,8 +102,7 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
                         <input
                             type="text"
                             readOnly
-                            className="checkout-input"
-                            style={{ marginBottom: '12px', color: 'var(--text-secondary)' }}
+                            className="checkout-input mb-3 text-[var(--text-secondary)]"
                             value={shippingInfo.roadAddress}
                         />
                     )}
@@ -146,7 +121,7 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
 
                 {/* 배송 메모 */}
                 <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    <label className="block text-[14px] font-medium text-[var(--text-secondary)] mb-2">
                         배송 메모
                     </label>
                     <select
@@ -164,8 +139,7 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
                     {isCustomMemo && (
                         <input
                             type="text"
-                            className="checkout-input"
-                            style={{ marginTop: '12px' }}
+                            className="checkout-input mt-3"
                             placeholder="배송 메모를 직접 입력해주세요"
                             value={shippingInfo.memo}
                             onChange={e => setShippingInfo({ ...shippingInfo, memo: e.target.value })}

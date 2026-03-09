@@ -28,6 +28,14 @@
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
+  "browserslist": [
+    "chrome >= 80",
+    "edge >= 80",
+    "firefox >= 80",
+    "safari >= 13",
+    "ios >= 13",
+    "samsung >= 13"
+  ],
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",

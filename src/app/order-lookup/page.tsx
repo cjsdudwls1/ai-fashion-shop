@@ -2,40 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { CreditCard, Check } from 'lucide-react';
 import { getStatusInfo, ADMIN_BANK_INFO } from '@/lib/orderUtils';
 import toast from 'react-hot-toast';
-
-interface OrderData {
-    id: string;
-    status: string;
-    total_amount: number;
-    shipping_name: string;
-    shipping_phone: string;
-    shipping_address: string;
-    shipping_memo: string;
-    guest_order_code: string;
-    created_at: string;
-    order_items: {
-        id: string;
-        product_id: string;
-        product_title: string;
-        quantity: number;
-        price_at_purchase: number;
-        item_option: { color?: string; size?: string };
-    }[];
-}
-
-interface RecoveredOrder {
-    guest_order_code: string;
-    created_at: string;
-    total_amount: number;
-    status: string;
-    order_items: {
-        product_title: string;
-        quantity: number;
-        price_at_purchase: number;
-    }[];
-}
+import { Order, RecoveredOrder } from '@/types/order';
 
 export default function OrderLookupPage() {
     const [orderCode, setOrderCode] = useState('');
@@ -51,7 +21,7 @@ export default function OrderLookupPage() {
         }
     }, []);
     const [loading, setLoading] = useState(false);
-    const [order, setOrder] = useState<OrderData | null>(null);
+    const [order, setOrder] = useState<Order | null>(null);
     const [notFound, setNotFound] = useState(false);
 
     // 주문 코드 찾기 상태
@@ -92,7 +62,7 @@ export default function OrderLookupPage() {
             if (error || !data) {
                 setNotFound(true);
             } else {
-                setOrder(data as OrderData);
+                setOrder(data as Order);
             }
         } catch {
             setNotFound(true);
@@ -250,7 +220,7 @@ export default function OrderLookupPage() {
                                             </p>
 
                                             <div className="mb-4 flex flex-col gap-1">
-                                                {ro.order_items.map((item: any, idx: number) => (
+                                                {ro.order_items?.map((item: any, idx: number) => (
                                                     <p key={idx} className="text-sm text-gray-700 dark:text-gray-300 font-medium truncate flex items-center gap-1.5">
                                                         <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full inline-block"></span>
                                                         {item.product_title}
@@ -264,7 +234,7 @@ export default function OrderLookupPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setOrderCode(ro.guest_order_code);
+                                                        setOrderCode(ro.guest_order_code || '');
                                                         setPhone(forgotPhone.trim());
                                                         // 부드럽게 위로 올려주고, 위쪽 form에 값을 세팅함으로써 조회 유도
                                                         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -306,7 +276,7 @@ export default function OrderLookupPage() {
                             <div className="bg-gray-50 dark:bg-[#1A1A1A] border border-gray-200 dark:border-gray-700 p-6 sm:p-8 rounded-2xl">
                                 <div className="flex items-center gap-2 mb-4">
                                     <div className="w-8 h-8 rounded-lg bg-[var(--primary-color)]/10 flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-4 h-4 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                        <CreditCard className="w-4 h-4 text-[var(--primary-color)]" />
                                     </div>
                                     <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-wide">입금 안내</h2>
                                 </div>
@@ -337,7 +307,7 @@ export default function OrderLookupPage() {
                             <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-6 sm:p-8 rounded-2xl">
                                 <div className="flex items-center gap-2 mb-4">
                                     <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                     <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-400 tracking-wide">주문 확인 완료</h2>
                                 </div>
@@ -421,22 +391,6 @@ export default function OrderLookupPage() {
                     </div>
                 )}
             </div>
-            {/* 애니메이션 스타일 */}
-            <style jsx>{`
-                @keyframes fade-in-down {
-                    0% {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                .animate-fade-in-down {
-                    animation: fade-in-down 0.4s ease-out forwards;
-                }
-            `}</style>
         </div>
     );
 }

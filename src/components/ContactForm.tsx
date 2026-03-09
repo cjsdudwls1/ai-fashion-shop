@@ -4,7 +4,8 @@ import React from 'react';
 import { useForm, ValidationError } from '@formspree/react';
 
 export function ContactForm() {
-    const [state, handleSubmit] = useForm("xojndnaz");
+    // [2026-03-06] 그룹 G: Formspree ID 환경변수 전환
+    const [state, handleSubmit] = useForm(process.env.NEXT_PUBLIC_FORMSPREE_ID || "xojndnaz");
 
     if (state.succeeded) {
         return (

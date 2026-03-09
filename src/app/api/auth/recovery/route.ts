@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { nameToEmail } from '@/lib/authHelpers';
 
 export async function POST(request: Request) {
     try {
@@ -54,47 +55,23 @@ export async function POST(request: Request) {
 
             // 2. 로그인 시 생성되는 이메일(nameToEmail)과 연결된 계정(고스트 계정)도 동일하게 비밀번호 업데이트 
             //    (이름을 변경한 경우 로그인 시 Ghost 계정으로 시도될 수 있으므로 둘 다 변경)
-            const nameToEmail = (inputName: string): string => {
-                const n = inputName.trim();
-                if (n.includes('@')) return n;
-                const encoder = new TextEncoder();
-                const bytes = encoder.encode(n);
-                let hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-                if (hex.length > 50) {
-                    let h1 = 0x811c9dc5; let h2 = 0;
-                    for (let i = 0; i < n.length; i++) {
-                        const c = n.charCodeAt(i);
-                        h1 ^= c; h1 = Math.imul(h1, 0x01000193) >>> 0;
-                        h2 = (h2 * 31 + c) >>> 0;
-                    }
-                    hex = `${h1.toString(36)}${h2.toString(36)}${n.length.toString(36)}`;
+            
+            // O(1) Direct Access Pattern: auth.users 대신 profiles 테이블의 username(또는 full_name)을 통해 고스트 계정 id 직접 조회
+            const { data: ghostProfiles } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .eq('username', name.trim())
+                .limit(1);
+
+            if (ghostProfiles && ghostProfiles.length > 0) {
+                const targetUserId = ghostProfiles[0].id;
+                if (targetUserId !== userId) {
+                    const res2 = await supabaseAdmin.auth.admin.updateUserById(
+                        targetUserId,
+                        { password: newPassword }
+                    );
+                    if (res2.error) lastUpdateError = res2.error;
                 }
-                return `u_${hex}@aifashion-store.com`;
-            };
-            const generatedEmail = nameToEmail(name);
-
-            // 해당 이메일을 가진 사용자를 찾아서 비밀번호 변경
-            let page = 1;
-            let targetUser = null;
-            while (true) {
-                const { data } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 100 });
-                if (!data || !data.users || data.users.length === 0) break;
-
-                const found = data.users.find((u: any) => u.email === generatedEmail);
-                if (found) {
-                    targetUser = found;
-                    break;
-                }
-                if (data.users.length < 100) break;
-                page++;
-            }
-
-            if (targetUser && targetUser.id !== userId) {
-                const res2 = await supabaseAdmin.auth.admin.updateUserById(
-                    targetUser.id,
-                    { password: newPassword }
-                );
-                if (res2.error) lastUpdateError = res2.error;
             }
 
             if (lastUpdateError) {

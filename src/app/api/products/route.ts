@@ -3,17 +3,12 @@
 // GET: 전체 상품 조회
 
 import { NextRequest, NextResponse } from 'next/server';
-import { productStore, parseColorStock, parseSizeStock } from '@/lib/productStore';
-import { Product } from '@/lib/types';
+import { productStore } from '@/lib/productStore';
 import { productSchema } from '@/lib/validations';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { requireAdmin, handleAuthError } from '@/lib/authUtils';
+import { createProduct } from '@/services/product';
 import type { ZodIssue } from 'zod';
-
-// 고유 ID 생성
-function generateId(): string {
-    return `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
 
 // GET: 전체 상품 조회
 export async function GET(request: NextRequest) {
@@ -66,70 +61,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const body = validationResult.data;
-
-        // 미디어 생성 타입 (기본값: video)
-        const mediaGenerationType = body.mediaGenerationType || 'video';
-
-        // 상품 ID 생성
-        const productId = generateId();
-
-        // 색상/사이즈 파싱
-        const colors = parseColorStock(body.colorsText || '');
-        const sizes = parseSizeStock(body.sizesText || '');
-
-        // 성별 기본값 처리
-        const gender = body.gender || 'female';
-
-        // 새 상품 생성
-        const newProduct: Product = {
-            id: productId,
-            name: body.name,
-            imageUrl: body.imageUrl || body.imageBase64 || '', // Base64 대신 URL 사용
-            galleryImages: body.galleryImages?.map((img: any) => ({
-                url: img.url || img.base64 || '',
-                color: img.color,
-                isPrimary: img.isPrimary
-            })) || [], // 갤러리 이미지 저장
-            fabric: body.fabric,
-            gender,
-            category: body.category, // New field
-            colors,
-            sizes,
-            videoUrl: null,
-            audioUrl: null,
-            videoStatus: mediaGenerationType === 'none' ? 'completed' : 'pending',
-            mediaGenerationType,
-            narrationText: body.narrationText || null,
-            videoModel: body.videoModel || null,
-            price: body.price, // Add price
-            createdAt: new Date(),
-        };
-
-        // 저장소에 추가
-        await productStore.addProduct(newProduct, supabaseAdmin);
-        console.log(`[Product] 새 상품 등록: ${productId} - ${body.name} (${gender === 'female' ? '여성복' : '남성복'}) [미디어: ${mediaGenerationType}]`);
-
-        // AI 미디어 생성 자동 트리거 (video 또는 image 선택 시)
-        if (mediaGenerationType === 'video' || mediaGenerationType === 'image') {
-            console.log(`[Product] AI 미디어 생성 트리거 시작... (Sync Worker 킥오프) [모드: ${mediaGenerationType}]`);
-
-            // Vercel, Netlify 타임아웃 방지: 비동기 워커로 실제 처리를 이관함
-            const host = request.headers.get('host');
-            const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-            fetch(`${protocol}://${host}/api/admin/videos/sync`, { method: 'GET' }).catch(() => { });
-        } else {
-            console.log(`[Product] 미디어 생성 건너뜀 (선택: ${mediaGenerationType})`);
-        }
+        // 서비스 레이어에 위임
+        const host = request.headers.get('host');
+        const isDev = process.env.NODE_ENV === 'development';
+        const result = await createProduct(validationResult.data, host, isDev);
 
         return NextResponse.json({
             success: true,
-            product: newProduct,
-            message: mediaGenerationType === 'video'
-                ? '상품이 등록되었습니다. AI 영상이 백그라운드에서 안전하게 생성됩니다.'
-                : mediaGenerationType === 'image'
-                    ? '상품이 등록되었습니다. AI 이미지가 백그라운드에서 생성됩니다.'
-                    : '상품이 등록되었습니다.',
+            product: result.product,
+            message: result.message,
         });
 
     } catch (error) {

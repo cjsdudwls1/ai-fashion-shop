@@ -46,24 +46,11 @@ export async function PATCH(
         const { id } = await params;
         const body = await request.json();
 
-        // 직접 supabaseAdmin을 사용하여 업데이트
-        const { supabaseAdmin } = await import('@/lib/supabaseAdmin');
+        // productStore.updateProduct를 사용하여 부분 업데이트 (DB 접근 추상화 계층 활용)
+        const success = await productStore.updateProduct(id, body);
 
-        const updates: any = {};
-        if (body.name !== undefined) updates.name = body.name;
-        if (body.colors !== undefined) updates.colors = body.colors;
-        if (body.sizes !== undefined) updates.sizes = body.sizes;
-        if (body.price !== undefined) updates.price = body.price;
-        // 다른 필드 필요 시 추가 가능
-
-        const { error } = await supabaseAdmin
-            .from('products')
-            .update(updates)
-            .eq('id', id);
-
-        if (error) {
-            console.error('상품 업데이트 에러:', error);
-            return NextResponse.json({ error: '상품 업데이트 실패' }, { status: 500 });
+        if (!success) {
+            return NextResponse.json({ error: '상품 업데이트 실패 (또는 대상 없음)' }, { status: 500 });
         }
 
         return NextResponse.json({ success: true, message: '상품이 성공적으로 업데이트되었습니다.' });

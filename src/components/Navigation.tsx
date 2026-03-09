@@ -5,54 +5,22 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ThemeToggle } from './ThemeToggle';
-import { User } from '@supabase/supabase-js';
 import { useCartStore } from '@/store/cartStore';
-import { Menu, X, ShoppingBag, User as UserIcon, LogOut, Package, ShieldCheck } from 'lucide-react';
+import { useAdmin } from '@/hooks/useAdmin';
+import { Menu, X, ShoppingBag, User as UserIcon, LogOut, Package, ShieldCheck, ChevronRight, MessageCircle, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Navigation() {
     const router = useRouter();
     const pathname = usePathname();
-    const [user, setUser] = useState<User | null>(null);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const { user, isAdmin } = useAdmin();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const clearCart = useCartStore((state) => state.clearCart);
-
-    useEffect(() => {
-        // 초기 세션 확인
-        const checkUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-            checkAdmin(user);
-        };
-        checkUser();
-
-        // 인증 상태 변경 감지
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user || null);
-            checkAdmin(session?.user || null);
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
 
     // 페이지 이동 시 모바일 메뉴 닫기
     useEffect(() => {
         setIsMobileMenuOpen(false);
     }, [pathname]);
-
-    const checkAdmin = async (currentUser: User | null) => {
-        if (!currentUser) {
-            setIsAdmin(false);
-            return;
-        }
-        const { data } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', currentUser.id)
-            .single();
-        setIsAdmin(data?.role === 'admin');
-    };
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -71,9 +39,7 @@ export function Navigation() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2 group z-50">
                         <div className="w-6 h-6 flex items-center justify-center border border-[var(--text-primary)] transition-all duration-300 group-hover:bg-[var(--text-primary)]">
-                            <svg className="w-3.5 h-3.5 text-[var(--text-primary)] group-hover:text-[var(--bg-dark)] transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
+                            <Zap className="w-3.5 h-3.5 text-[var(--text-primary)] group-hover:text-[var(--bg-dark)] transition-colors duration-300" />
                         </div>
                         <span className="text-lg font-medium tracking-wide truncate mt-0.5">AI FASHION</span>
                     </Link>
@@ -185,7 +151,7 @@ export function Navigation() {
                                 <span className="font-semibold text-[var(--text-primary)]">쇼핑하기</span>
                                 <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">전체 상품 둘러보기</span>
                             </div>
-                            <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" />
                         </Link>
                     </div>
 
@@ -200,13 +166,13 @@ export function Navigation() {
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
                             <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                                <MessageCircle className="w-5 h-5 text-emerald-500" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-semibold text-[var(--text-primary)]">문의</span>
                                 <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">파트너십 및 제휴 문의</span>
                             </div>
-                            <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" />
                         </Link>
                     </div>
 
@@ -227,7 +193,7 @@ export function Navigation() {
                                         <span className="font-semibold text-violet-600 dark:text-violet-400">관리자 페이지</span>
                                         <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">상품 및 주문 관리</span>
                                     </div>
-                                    <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" />
                                 </Link>
                             </div>
                         </>
@@ -251,7 +217,7 @@ export function Navigation() {
                                     <span className="font-semibold text-[var(--text-primary)]">마이페이지</span>
                                     <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">주문 내역 및 프로필</span>
                                 </div>
-                                <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto" />
                             </Link>
                             <button
                                 onClick={handleLogout}

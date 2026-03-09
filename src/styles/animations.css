@@ -1,0 +1,94 @@
+/* ==========================================================================
+   공통 CSS 키프레임 애니메이션 및 Hover 유틸리티
+   [2026-03-06] 그룹 B 리팩토링: styled-jsx 중복 애니메이션 통합
+   사유: fade-in-down 키프레임이 login/page.tsx, order-lookup/page.tsx 등
+   4곳 이상에서 <style jsx>로 중복 정의되어 있었음.
+   이 파일로 통합하여 일관성과 유지보수성을 확보.
+   근거: .docs/refactoring-group-b-styling.md
+   ========================================================================== */
+
+/* fade-in-down: 위에서 아래로 나타나는 애니메이션 */
+@keyframes fade-in-down {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-down {
+    animation: fade-in-down 0.4s ease-out forwards;
+}
+
+/* ==========================================================================
+   Hover 유틸리티 클래스
+   [2026-03-06] 그룹 B 리팩토링: onMouseEnter/onMouseLeave DOM 조작 대체
+   사유: JavaScript 기반 hover 효과를 CSS :hover 의사 클래스로 교체하여
+   성능(reflow 방지) 및 가독성 개선.
+   근거: MDN - :hover, .docs/refactoring-group-b-styling.md
+   ========================================================================== */
+
+/* 호버 시 box-shadow 추가 */
+.hover-shadow {
+    transition: box-shadow 0.2s ease;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 호버 시 opacity 감소 (버튼용) */
+.hover-opacity {
+    transition: opacity 0.2s ease;
+}
+
+.hover-opacity:hover {
+    opacity: 0.85;
+}
+
+/* 호버 시 brightness 증가 */
+.hover-brightness {
+    transition: filter 0.2s ease;
+}
+
+.hover-brightness:hover {
+    filter: brightness(1.08);
+}
+
+/* 호버 시 텍스트 색상 red 전환 (삭제 버튼용) */
+.hover-color-danger {
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.hover-color-danger:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+/* 호버 시 텍스트 색상 red + 배경색 전환 (카트 삭제 버튼용) */
+.hover-delete-btn {
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.hover-delete-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+/* 호버 시 배경색 elevated 전환 */
+.hover-bg-elevated {
+    transition: background-color 0.2s ease;
+}
+
+.hover-bg-elevated:hover {
+    background: var(--bg-elevated);
+}
+
+/* body.menu-open: 모바일 메뉴 열림 시 스크롤 방지 */
+body.menu-open {
+    overflow: hidden;
+}

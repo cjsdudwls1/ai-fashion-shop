@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LayoutGrid, Plus, Inbox, ClipboardList, type LucideIcon } from 'lucide-react';
 
 interface AdminSidebarProps {
     onNavigate?: () => void;
@@ -10,11 +11,11 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ onNavigate }: AdminSidebarProps) {
     const pathname = usePathname();
 
-    const menuItems = [
-        { name: '대시보드', path: '/admin/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
-        { name: '상품 등록', path: '/admin', icon: 'M12 4v16m8-8H4', exact: true },
-        { name: '재고 관리', path: '/admin/inventory', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' },
-        { name: '주문 관리', path: '/admin/orders', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+    const menuItems: { name: string; path: string; icon: LucideIcon; exact?: boolean }[] = [
+        { name: '대시보드', path: '/admin/dashboard', icon: LayoutGrid },
+        { name: '상품 등록', path: '/admin', icon: Plus, exact: true },
+        { name: '재고 관리', path: '/admin/inventory', icon: Inbox },
+        { name: '주문 관리', path: '/admin/orders', icon: ClipboardList },
     ];
 
     return (
@@ -39,9 +40,7 @@ export default function AdminSidebar({ onNavigate }: AdminSidebarProps) {
                                 {isActive && (
                                     <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-r-lg"></div>
                                 )}
-                                <svg className={`w-6 h-6 relative z-10 transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d={item.icon}></path>
-                                </svg>
+                                <item.icon className={`w-6 h-6 relative z-10 transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-white'}`} strokeWidth={2.5} />
                                 <span className="relative z-10">{item.name}</span>
                             </Link>
                         );

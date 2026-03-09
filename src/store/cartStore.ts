@@ -1,16 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export interface CartItem {
-    id: string; // product id
-    title: string;
-    price: number;
-    image_url?: string;
-    quantity: number;
-    category?: string;
-    selectedColor?: string;
-    selectedSize?: string;
-}
+// [2026-03-06] 그룹 H: CartItem 타입을 공유 타입 파일로 이동
+// 기존 import 경로 호환을 위해 re-export 유지
+// 근거: .docs/refactoring-group-h-type-safety.md L-13
+export type { CartItem } from '@/types/cart';
+import type { CartItem } from '@/types/cart';
 
 interface CartStore {
     items: CartItem[];

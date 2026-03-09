@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import AdminSidebar from './AdminSidebar';
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
@@ -18,14 +19,12 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // 모바일에서 사이드바가 열릴 때 body 스크롤 방지
+    // [2026-03-06] 그룹 B 리팩토링: document.body.style → CSS 클래스 토글
+    // 사유: React 외부 DOM 직접 조작 제거. animations.css의 body.menu-open 규칙 사용.
+    // 근거: .docs/refactoring-group-b-styling.md Step 4
     useEffect(() => {
-        if (isMobile && sidebarOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => { document.body.style.overflow = ''; };
+        document.body.classList.toggle('menu-open', isMobile && sidebarOpen);
+        return () => { document.body.classList.remove('menu-open'); };
     }, [isMobile, sidebarOpen]);
 
     return (
@@ -54,11 +53,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                         transition: 'all 0.2s',
                     }}
                 >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <line x1="3" y1="12" x2="21" y2="12" />
-                        <line x1="3" y1="18" x2="21" y2="18" />
-                    </svg>
+                    <Menu size={22} style={{ color: 'var(--text-primary)' }} />
                 </button>
             )}
 

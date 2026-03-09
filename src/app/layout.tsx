@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
+import GlobalSyncPoller from "@/components/GlobalSyncPoller";
 
 import { Toaster } from 'react-hot-toast';
 
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body className={`${inter.variable} antialiased`}>
         <Toaster position="top-center" containerStyle={{ top: 76 }} />
         <Navigation />
+        <GlobalSyncPoller />
 
         {/* 메인 컨텐츠 */}
         <main className="min-h-screen">

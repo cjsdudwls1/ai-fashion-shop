@@ -22,6 +22,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // 재배포 후 브라우저 캐시 잔존 방지: HTML 페이지에 no-cache 헤더 설정
+  // 참고: https://docs.netlify.com/platform/caching/#default-values
+  async headers() {
+    return [
+      {
+        // _next/static(JS/CSS 번들)과 _next/image(이미지 최적화)를 제외한 모든 경로
+        source: '/((?!_next/static|_next/image).*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate, no-cache',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 

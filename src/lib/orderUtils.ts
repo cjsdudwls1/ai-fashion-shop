@@ -9,6 +9,13 @@ export type OrderStatus =
     | 'delivered'
     | 'cancelled';
 
+// [2026-03-06] 그룹 F: 주문 상태 값 상수 배열
+// 사유: orders/[id]/route.ts 등에서 하드코딩된 validStatuses 배열 제거
+// 근거: .docs/refactoring-group-f-shared-utils.md L-7
+export const ORDER_STATUSES: OrderStatus[] = [
+    'pending_payment', 'payment_confirming', 'paid', 'shipped', 'delivered', 'cancelled'
+] as const as unknown as OrderStatus[];
+
 export interface StatusInfo {
     label: string;
     color: string;
@@ -58,19 +65,31 @@ export function getStatusInfo(status: string): StatusInfo {
     );
 }
 
-// 관리자 계좌 정보 (환경변수 또는 하드코딩)
+// [2026-03-06] 그룹 G: 계좌 정보 환경변수 전환
+// 사유: 민감 정보를 소스코드에서 분리하여 Git 이력에서 노출 방지
+// 근거: .docs/refactoring-group-g-security.md L-11
 export const ADMIN_BANK_INFO = {
-    bankName: '국민은행',
-    accountNumber: '218301-04-318699',
-    accountHolder: '천영진',
+    bankName: process.env.ADMIN_BANK_NAME || '농협',
+    accountNumber: process.env.ADMIN_BANK_ACCOUNT || '',
+    accountHolder: process.env.ADMIN_BANK_HOLDER || '',
 };
 
-// 주문번호 생성 (8자리 영숫자)
+// 배송비 정책
+export const SHIPPING_FEE = 3000; // 기본 배송비
+export const FREE_SHIPPING_THRESHOLD = 30000; // 무료 배송 기준 금액
+
+export function getShippingFee(totalProductPrice: number): number {
+    return totalProductPrice >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+}
+
+// 주문번호 생성 (8자리 영숫자) - 암호학적으로 안전한 Web Crypto API 사용
 export function generateOrderCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const array = new Uint32Array(8);
+    crypto.getRandomValues(array);
     let result = '';
     for (let i = 0; i < 8; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+        result += chars[array[i] % chars.length];
     }
     return result;
 }

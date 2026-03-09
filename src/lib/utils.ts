@@ -5,10 +5,9 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-/**
- * 숫자를 한국 원화 형식으로 포맷합니다.
- * @example formatPrice(25000) → '25,000원'
- */
-export function formatPrice(price: number): string {
-    return price.toLocaleString('ko-KR') + '원';
+// [2026-03-06] 그룹 G: Math.random() → crypto.randomUUID() 전환
+// 사유: Math.random()은 암호학적으로 안전하지 않음
+// 근거: .docs/refactoring-group-g-security.md L-15
+export function generateId(): string {
+    return `prod_${crypto.randomUUID()}`;
 }

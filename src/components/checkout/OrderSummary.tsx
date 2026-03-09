@@ -1,7 +1,9 @@
 "use client";
 
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 import { CartItem } from '@/store/cartStore';
+import { getShippingFee, FREE_SHIPPING_THRESHOLD } from '@/lib/orderUtils';
 
 interface OrderSummaryProps {
     items: CartItem[];
@@ -9,59 +11,70 @@ interface OrderSummaryProps {
     isProcessing: boolean;
     onPayment: () => void;
     hideCta?: boolean;
+    ctaText?: string;
+    processingText?: string;
+    footerText?: string;
+    titleText?: string;
 }
 
-export default function OrderSummary({ items, totalPrice, isProcessing, onPayment, hideCta = false }: OrderSummaryProps) {
+export default function OrderSummary({
+    items,
+    totalPrice,
+    isProcessing,
+    onPayment,
+    hideCta = false,
+    ctaText,
+    processingText = '처리 중...',
+    footerText = '위 주문 내용을 확인하였으며 결제에 동의합니다.',
+    titleText = '주문 요약'
+}: OrderSummaryProps) {
+    const shippingFee = getShippingFee(totalPrice);
+    const finalPrice = totalPrice + shippingFee;
     return (
         <section className="order-summary-card">
-            <h2 className="order-summary-title">주문 요약</h2>
+            <h2 className="order-summary-title">{titleText}</h2>
 
             {/* Items List — 썸네일 72px (#7) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '280px', overflowY: 'auto', marginBottom: '24px', paddingRight: '4px' }}>
+            <div className="flex flex-col gap-4 max-h-[280px] overflow-y-auto mb-6 pr-1">
                 {items.map((item, idx) => (
                     <div
                         key={`${item.id}-${item.selectedColor}-${item.selectedSize}-${idx}`}
-                        style={{
-                            display: 'flex',
-                            gap: '16px',
-                            paddingBottom: '16px',
-                            borderBottom: idx < items.length - 1 ? '1px solid var(--border-color)' : 'none',
-                        }}
+                        className={`flex gap-4 pb-4 ${idx < items.length - 1 ? 'border-b border-[var(--border-color)]' : ''}`}
                     >
                         {/* 썸네일 72px (#7-1) */}
                         <div className="checkout-thumb">
                             {item.image_url ? (
                                 <img src={item.image_url} alt={item.title} />
                             ) : (
-                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                                <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] text-[11px]">
                                     No Img
                                 </div>
                             )}
                         </div>
 
                         {/* 상품 정보 — 단가/수량/소계 구조 (#7-2) */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-semibold text-[var(--text-primary)] overflow-hidden text-ellipsis whitespace-nowrap">
                                 {item.title}
                             </p>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                            <div className="flex flex-wrap gap-1 mt-1.5">
                                 {item.selectedColor && (
-                                    <span style={{ display: 'inline-block', fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--bg-elevated)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                    <span className="inline-block text-[12px] text-[var(--text-secondary)] bg-[var(--bg-elevated)] px-2 py-0.5 rounded border border-[var(--border-color)]">
                                         {item.selectedColor}
                                     </span>
                                 )}
                                 {item.selectedSize && (
-                                    <span style={{ display: 'inline-block', fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--bg-elevated)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                    <span className="inline-block text-[12px] text-[var(--text-secondary)] bg-[var(--bg-elevated)] px-2 py-0.5 rounded border border-[var(--border-color)]">
                                         {item.selectedSize}
                                     </span>
                                 )}
                             </div>
                             {/* 단가 x 수량 = 소계 */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[12px] text-[var(--text-muted)]">
                                     {item.price.toLocaleString()}원 x {item.quantity}개
                                 </span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                <span className="text-[14px] font-bold text-[var(--text-primary)]">
                                     {(item.price * item.quantity).toLocaleString()}원
                                 </span>
                             </div>
@@ -71,20 +84,28 @@ export default function OrderSummary({ items, totalPrice, isProcessing, onPaymen
             </div>
 
             {/* Price Summary */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
+            <div className="border-t border-[var(--border-color)] pt-4 mb-6">
+                <div className="flex justify-between text-[var(--text-secondary)] text-[14px] mb-3">
                     <span>총 상품금액</span>
                     <span>{totalPrice.toLocaleString()}원</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
+                <div className="flex justify-between text-[var(--text-secondary)] text-[14px] mb-4">
                     <span>배송비</span>
-                    {/* #3: 무료 텍스트는 Gray 500으로 (#3-1) */}
-                    <span style={{ color: 'var(--checkout-gray-500)', fontWeight: 500 }}>무료</span>
+                    {shippingFee === 0 ? (
+                        <span className="text-[var(--checkout-gray-500)] font-medium">무료</span>
+                    ) : (
+                        <span className="font-medium">{shippingFee.toLocaleString()}원</span>
+                    )}
                 </div>
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {shippingFee > 0 && (
+                    <p className="text-[12px] text-[var(--text-muted)] mb-4 -mt-2">
+                        {FREE_SHIPPING_THRESHOLD.toLocaleString()}원 이상 구매 시 배송비 무료
+                    </p>
+                )}
+                <div className="border-t border-[var(--border-color)] pt-4 flex justify-between items-center">
                     <span className="order-summary-total-label">총 결제금액</span>
                     <span className="order-summary-total-price">
-                        {totalPrice.toLocaleString()}원
+                        {finalPrice.toLocaleString()}원
                     </span>
                 </div>
             </div>
@@ -99,18 +120,15 @@ export default function OrderSummary({ items, totalPrice, isProcessing, onPaymen
                     >
                         {isProcessing ? (
                             <>
-                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                처리 중...
+                                <Loader2 className="animate-spin h-5 w-5 text-white inline-block mr-2 -mt-0.5" />
+                                {processingText}
                             </>
                         ) : (
-                            `${totalPrice.toLocaleString()}원 결제하기`
+                            ctaText || `${finalPrice.toLocaleString()}원 결제하기`
                         )}
                     </button>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px' }}>
-                        위 주문 내용을 확인하였으며 결제에 동의합니다.
+                    <p className="text-[12px] text-[var(--text-muted)] text-center mt-3">
+                        {footerText}
                     </p>
                 </>
             )}

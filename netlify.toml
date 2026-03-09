@@ -1,0 +1,17 @@
+# ============================================================
+# Netlify 캐시 제어 설정
+# 재배포 후 사용자 브라우저에 이전 캐시가 남는 문제 방지
+# 참고: https://docs.netlify.com/routing/headers/
+# ============================================================
+
+[[headers]]
+  # HTML 페이지 응답: 브라우저가 캐시 사용 전 반드시 서버에 유효성 확인 요청
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate, no-cache"
+
+[[headers]]
+  # Next.js 정적 에셋: 파일명에 빌드 해시가 포함되므로 장기 캐시 안전
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
