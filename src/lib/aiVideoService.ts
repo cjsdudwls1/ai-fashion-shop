@@ -144,6 +144,7 @@ export async function triggerVeoVideo(
 export async function checkVeoVideo(operationName: string): Promise<{
     status: 'running' | 'succeed' | 'failed';
     videoUri?: string;
+    videoBytes?: string;
     error?: string;
 }> {
     try {
@@ -170,14 +171,21 @@ export async function checkVeoVideo(operationName: string): Promise<{
                 return { status: 'failed', error: errorMsg };
             }
 
-            // SDK 응답 구조: response.generatedVideos[].video.uri
+            // SDK 응답 구조: response.generatedVideos[].video.uri 또는 response.generatedVideos[].video.videoBytes
             const videos = operation.response?.generatedVideos;
 
             if (videos && videos.length > 0) {
-                const videoUri = videos[0].video?.uri;
-                if (videoUri) {
-                    console.log(`[Veo] 영상 생성 완료! URI: ${videoUri.substring(0, 80)}...`);
-                    return { status: 'succeed', videoUri };
+                const videoObj = videos[0].video;
+                if (videoObj?.uri) {
+                    console.log(`[Veo] 영상 생성 완료(URI 반환형)! URI: ${videoObj.uri.substring(0, 80)}...`);
+                    return { status: 'succeed', videoUri: videoObj.uri };
+                }
+                
+                // [2026-03-31] 최신 SDK 호환: Base64 직접 반환 대응
+                const videoBytes = (videoObj as any)?.videoBytes || (videoObj as any)?.data;
+                if (videoBytes) {
+                    console.log(`[Veo] 영상 생성 완료(Base64 반환형)! Bytes 길이: ${videoBytes.length}`);
+                    return { status: 'succeed', videoBytes };
                 }
             }
 

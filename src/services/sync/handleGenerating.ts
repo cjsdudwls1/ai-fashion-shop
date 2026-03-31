@@ -62,12 +62,23 @@ export async function handleGenerating(ctx: SyncContext): Promise<SyncHandlerRes
     const currentGender = isGeneratingMale ? 'male' : 'female';
     const statusRes = await checkVeoVideo(product.klingTaskId!);
 
-    if (statusRes.status === 'succeed' && statusRes.videoUri) {
+    if (statusRes.status === 'succeed') {
         console.log(`[Sync Worker] Veo 영상 완료 (${currentGender}), Cloudinary 업로드 시작`);
 
         try {
-            const arrayBuffer = await downloadVeoVideo(statusRes.videoUri);
-            console.log(`[Sync Worker] 영상 다운로드 완료 (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+            let arrayBuffer: ArrayBuffer;
+            
+            if (statusRes.videoUri) {
+                arrayBuffer = await downloadVeoVideo(statusRes.videoUri);
+                console.log(`[Sync Worker] 영상 다운로드 완료(URI) (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+            } else if (statusRes.videoBytes) {
+                // Base64 문자열을 Buffer로 디코딩 후 ArrayBuffer로 변환
+                const buffer = Buffer.from(statusRes.videoBytes, 'base64');
+                arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+                console.log(`[Sync Worker] 영상 디코딩 완료(Base64) (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+            } else {
+                throw new Error('비디오 데이터(URI 또는 Bytes)가 전달되지 않았습니다.');
+            }
 
             const videoSuffix = product.gender === 'unisex' ? `${product.id}_${currentGender}` : product.id;
             const cloudinaryUrl = await uploadVideoToCloudinary(arrayBuffer, videoSuffix);
