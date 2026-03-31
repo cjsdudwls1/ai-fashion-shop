@@ -5,10 +5,13 @@ import { supabase } from '@/lib/supabase'
 
 export default function SocialLoginButtons() {
     const handleOAuthLogin = async (provider: 'google' | 'kakao') => {
+        const isLocal = window.location.hostname === 'localhost';
+        const redirectOrigin = isLocal ? 'http://localhost:3001' : 'https://ai-fashion-shop.netlify.app';
+
         await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: `${redirectOrigin}/auth/callback`,
             },
         })
     }

@@ -42,7 +42,13 @@ export default function ProfileSetupPage() {
         if (profile) {
             if (profile.phone_number) setPhone(profile.phone_number);
             // Pre-fill recipient name from profile name if available
-            if (profile.full_name) setRecipientName(profile.full_name);
+            if (profile.full_name) {
+                setRecipientName(profile.full_name);
+            } else if (user.user_metadata?.name) {
+                setRecipientName(user.user_metadata.name);
+            } else if (user.user_metadata?.full_name) {
+                setRecipientName(user.user_metadata.full_name);
+            }
         }
         setLoading(false);
     };
@@ -71,10 +77,11 @@ export default function ProfileSetupPage() {
         setSaving(true);
 
         try {
-            // 1. Update Profile (Phone)
+            // 1. Update Profile (Phone and Name)
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
+                    full_name: recipientName,
                     phone_number: phone,
                     is_setup_finished: true
                 })
