@@ -1,0 +1,32 @@
+﻿commit 1a8d87d0f351b60ec82462ecb20039d27c131bff
+Author: cjsdudwls1 <cjsdudwls1357@gmail.com>
+Date:   Tue Mar 31 11:34:58 2026 +0900
+
+    chore: save current state
+
+.gitignore
+package-lock.json
+package.json
+src/app/api/admin/videos/sync/route.ts
+src/app/api/auth/naver/callback/route.ts
+src/app/api/auth/naver/route.ts
+src/app/api/payments/prepare/route.ts
+src/app/api/payments/verify/route.ts
+src/app/auth/callback/page.tsx
+src/app/auth/callback/route.ts
+src/app/privacy/page.tsx
+src/app/profile/setup/page.tsx
+src/app/refund/page.tsx
+src/app/terms/page.tsx
+src/components/auth/LoginForm.tsx
+src/components/auth/SocialLoginButtons.tsx
+src/components/checkout/CheckoutClient.tsx
+src/components/checkout/PaymentMethodSelector.tsx
+src/lib/aiVideoService.ts
+src/lib/genaiClient.ts
+src/lib/portone.ts
+src/middleware.ts
+src/services/orderService.ts
+src/services/sync/authGuard.ts
+src/services/sync/index.ts
+src/types/order.ts

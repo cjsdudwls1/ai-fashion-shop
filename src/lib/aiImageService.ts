@@ -54,13 +54,27 @@ async function generateImage(
             }
         });
 
+        // [2026-03-31] 이미지 생성 시에도 안전성 필터(SAFETY) 거부 여부를 확인
+        const safetyBlock = (response as any).promptFeedback?.blockReason;
+        if (safetyBlock) {
+            console.warn(`${logPrefix} 안전성 필터 거부 (promptFeedback):`, safetyBlock);
+            return { success: false, error: `안전성 필터 위반: ${safetyBlock}` };
+        }
+
+        const firstCandidate = response.candidates?.[0];
+        if (firstCandidate?.finishReason === 'SAFETY') {
+            console.warn(`${logPrefix} 안전성 필터 거부 (finishReason = SAFETY)`);
+            return { success: false, error: '안전성 필터 위반 (SAFETY)' };
+        }
+
         const imageBuffer = extractImageFromResponse(response);
         if (imageBuffer) {
             console.log(`${logPrefix} 이미지 생성 성공!`);
             return { success: true, imageBuffer };
         }
 
-        return { success: false, error: 'API 응답에서 이미지 데이터를 찾을 수 없습니다.' };
+        const reason = firstCandidate?.finishReason ? `(종료 사유: ${firstCandidate.finishReason})` : '';
+        return { success: false, error: `API 응답에 이미지 데이터가 없습니다. ${reason}` };
 
     } catch (error) {
         console.error(`${logPrefix} 생성 오류:`, error);

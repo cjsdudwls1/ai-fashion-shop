@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncPolling } from '@/hooks/useSyncPolling';
+import { useAdmin } from '@/hooks/useAdmin';
 
 /**
  * 전역 Sync 폴러
@@ -12,6 +13,7 @@ import { useSyncPolling } from '@/hooks/useSyncPolling';
  * 변경: root layout에 GlobalSyncPoller를 마운트하여 모든 페이지에서 폴링 지속
  */
 export default function GlobalSyncPoller() {
-    useSyncPolling({ intervalMs: 15000 });
+    const { isAdmin } = useAdmin();
+    useSyncPolling({ enabled: isAdmin, intervalMs: 15000 });
     return null;
 }

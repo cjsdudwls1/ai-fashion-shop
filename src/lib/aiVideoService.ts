@@ -159,6 +159,17 @@ export async function checkVeoVideo(operationName: string): Promise<{
         });
 
         if (operation.done) {
+            // [2026-03-31] RAI (안전성 필터) 거부 사유 누락 해결
+            // Veo가 안전성 정책(선정성, 혐오표현 등) 위반으로 생성을 거부하면, 
+            // 에러를 던지지 않고 'done: true'상태로 빈 결과와 raiMediaFilteredCount 속성을 함께 반환합니다.
+            const responseData = (operation as any).response;
+            if (responseData?.raiMediaFilteredCount > 0) {
+                const reasons = responseData.raiMediaFilteredReasons?.join(', ') || '알 수 없는 안전성 사유';
+                const errorMsg = `안전성 필터 거부: ${reasons}`;
+                console.warn(`[Veo] 영상 생성 거부됨 (RAI 필터):`, reasons);
+                return { status: 'failed', error: errorMsg };
+            }
+
             // SDK 응답 구조: response.generatedVideos[].video.uri
             const videos = operation.response?.generatedVideos;
 
@@ -172,7 +183,13 @@ export async function checkVeoVideo(operationName: string): Promise<{
 
             // 에러로 완료된 경우 또는 응답 구조가 예상과 다른 경우
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const errorMsg = (operation as any).error?.message || '영상 URI를 찾을 수 없습니다.';
+            const errorObj = (operation as any).error;
+            let errorMsg = errorObj?.message;
+            if (!errorMsg) {
+                // 어떤 사유로 생성되지 않았는지 파악하기 위해 전체 객체를 덤프
+                const dump = JSON.stringify(operation, null, 2).substring(0, 500);
+                errorMsg = `영상 URI를 못찾음. Dump: ${dump}`;
+            }
             console.error(`[Veo] 영상 생성 실패:`, errorMsg);
             return { status: 'failed', error: errorMsg };
         }
