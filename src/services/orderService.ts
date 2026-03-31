@@ -18,7 +18,9 @@ export const orderService = {
         if (!shippingInfo?.name || !shippingInfo?.phone || !shippingInfo?.roadAddress) {
             throw new Error('배송지 정보를 입력해주세요.');
         }
-        if (!depositorName?.trim()) {
+        const method = input.paymentMethod || 'bank_transfer';
+
+        if (method === 'bank_transfer' && !depositorName?.trim()) {
             throw new Error('입금자명을 입력해주세요.');
         }
 
@@ -33,14 +35,16 @@ export const orderService = {
             .from('orders')
             .insert({
                 user_id: userId || null,
-                status: 'payment_confirming',
+                status: method === 'card' ? 'pending_payment' : 'payment_confirming',
                 total_amount: totalAmount,
                 shipping_name: shippingInfo.name,
                 shipping_phone: shippingInfo.phone,
                 shipping_address: fullAddress,
                 shipping_memo: shippingInfo.memo || null,
-                depositor_name: depositorName.trim(),
+                depositor_name: method === 'bank_transfer' ? depositorName.trim() : null,
                 guest_order_code: orderCode,
+                payment_method: method,
+                payment_id: input.paymentId || null,
             })
             .select('id')
             .single();
@@ -90,9 +94,11 @@ export const orderService = {
             throw new Error(`재고 차감에 실패했습니다. 상세 내용: ${deductResult.error}`);
         }
 
-        // 7. 텔레그램 알림 전송 (비동기로 실행되게)
-        const itemNames = items.map(i => `${i.title} (${i.quantity}개)`).join(', ');
-        notificationService.sendOrderNotification(orderCode, depositorName, totalAmount, itemNames);
+        // 7. 텔레그램 알림 전송 (비동기로 실행되게) - 무통장입금일 경우에만 즉시 발송. 카드는 사후 검증 후 발송
+        if (method === 'bank_transfer') {
+            const itemNames = items.map(i => `${i.title} (${i.quantity}개)`).join(', ');
+            notificationService.sendOrderNotification(orderCode, depositorName.trim(), totalAmount, itemNames);
+        }
 
         return {
             success: true,

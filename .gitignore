@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+.netlify_key_payload.json
+vertex-ai-key.json
+supabase/.temp/

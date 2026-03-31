@@ -1,14 +1,25 @@
-// GoogleGenAI 싱글톤 인스턴스
-// aiVideoService.ts와 aiImageService.ts에서 공유하여 중복 생성을 방지한다.
-
+// src/lib/genaiClient.ts
 import { GoogleGenAI } from '@google/genai';
 
-const GOOGLE_API_KEY = process.env.GEMINI_API_KEY || '';
+// 환경 변수 로드 상태 체크 (디버깅 용이)
+if (!process.env.GOOGLE_CLOUD_PROJECT || !process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+  console.warn("⚠️ Vertex AI 구동을 위한 필수 환경 변수가 누락되었습니다. (.env.local 확인)");
+}
 
 export const ai = new GoogleGenAI({
-    apiKey: GOOGLE_API_KEY,
-    httpOptions: {
-        timeout: 120_000, // 2분 (2K 이미지 생성 시 처리 시간 고려)
+  // Vertex AI 모드 활성화
+  vertexai: true,
+  
+  // 프로젝트 및 리전 지정
+  project: process.env.GOOGLE_CLOUD_PROJECT,
+  location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+  
+  // 서비스 계정 키를 직접 주입 (명시적 인증 방식)
+  googleAuthOptions: {
+    credentials: {
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      // 중요: Vercel/Netlify 배치 시 환경변수의 \n 문자가 이중 이스케이프(\\n)되는 흔한 버그를 방지
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }
+  }
 });
-// GOOGLE_API_KEY는 ai 인스턴스 내부에서만 사용 (외부 참조 없음)

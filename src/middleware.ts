@@ -95,6 +95,6 @@ export const config = {
          * - auth (auth callback)
          * - api (API routes)
          */
-        '/((?!_next/static|_next/image|favicon.ico|login|auth|api|checkout|order-lookup|cart|products|$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|login|auth|api|checkout|order-lookup|cart|products|terms|privacy|refund|$).*)',
     ],
 }

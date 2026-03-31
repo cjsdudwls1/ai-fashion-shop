@@ -69,4 +69,6 @@ export interface CreateOrderInput {
     shippingInfo: ShippingInfo;
     depositorName: string;
     totalAmount: number;
+    paymentMethod?: 'card' | 'bank_transfer';
+    paymentId?: string;
 }

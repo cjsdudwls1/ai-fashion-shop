@@ -194,17 +194,8 @@ export async function checkVeoVideo(operationName: string): Promise<{
 export async function downloadVeoVideo(videoUri: string): Promise<ArrayBuffer> {
     console.log(`[Veo] 영상 다운로드 시작: ${videoUri.substring(0, 80)}...`);
 
-    // SDK에서 반환된 videoUri는 인증 토큰이 포함된 서명된 URL이거나,
-    // API 키를 쿼리 파라미터로 추가해야 하는 URL일 수 있음.
-    // 먼저 서명된 URL로 시도하고, 실패 시 API 키를 추가하여 재시도.
-    let response = await fetch(videoUri, { redirect: 'follow' });
-
-    if (!response.ok && response.status === 403) {
-        // 인증 필요: API 키 추가
-        const apiKey = process.env.GEMINI_API_KEY || '';
-        const separator = videoUri.includes('?') ? '&' : '?';
-        response = await fetch(`${videoUri}${separator}key=${apiKey}`, { redirect: 'follow' });
-    }
+    // Vertex AI 모드: SDK가 서명된(인증 토큰 포함) URL을 반환하므로 직접 fetch만 수행
+    const response = await fetch(videoUri, { redirect: 'follow' });
 
     if (!response.ok) {
         throw new Error(`영상 다운로드 실패: HTTP ${response.status}`);

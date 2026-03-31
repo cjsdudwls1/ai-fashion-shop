@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { User, Lock } from 'lucide-react';
 import { nameToEmail } from '@/lib/authHelpers';
+import SocialLoginButtons from './SocialLoginButtons';
 
 export interface LoginFormProps {
     onToggleMode: () => void;
@@ -93,6 +94,8 @@ export default function LoginForm({ onToggleMode }: LoginFormProps) {
             >
                 {loading ? '처리 중...' : '로그인하기'}
             </button>
+
+            <SocialLoginButtons />
 
             <div className="flex flex-col items-center gap-4 mt-6">
                 <div className="flex items-center gap-3">

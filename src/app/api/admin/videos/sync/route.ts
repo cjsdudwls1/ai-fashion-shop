@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { productStore } from '@/lib/productStore';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { verifyCronSecret, handlePending, handleGenerating, handleDeadzone } from '@/services/sync';
+import { verifySyncAuth, handlePending, handleGenerating, handleDeadzone } from '@/services/sync';
 import type { SyncContext } from '@/services/sync';
 
 // Vercel Pro 타임아웃 확장 (초 단위)
@@ -11,8 +11,8 @@ export const maxDuration = 60;
 // 한 번의 호출에 1개 상품만 처리하여 타임아웃 방지
 // 워크플로우: pending → generating → completed / failed
 export async function GET(request: NextRequest) {
-    // 내부 호출 전용 보호: CRON_SECRET 헤더 검증
-    const forbidden = verifyCronSecret(request);
+    // 인증: 관리자 계정 또는 CRON_SECRET 헤더 필수
+    const forbidden = await verifySyncAuth(request);
     if (forbidden) return forbidden;
 
     try {

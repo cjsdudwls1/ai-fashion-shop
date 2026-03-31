@@ -12,6 +12,9 @@ import toast from 'react-hot-toast';
 import { syncLatestPrices } from '@/services/priceService';
 import { useCheckoutAuth } from '@/hooks/useCheckoutAuth';
 import { useCheckoutForm } from '@/hooks/useCheckoutForm';
+import * as PortOne from '@portone/browser-sdk/v2';
+import PaymentMethodSelector, { PaymentMethodType } from '@/components/checkout/PaymentMethodSelector';
+import { PORTONE_STORE_ID, PORTONE_CHANNEL_KEY } from '@/lib/portone';
 
 export default function CheckoutClient() {
     const router = useRouter();
@@ -32,6 +35,7 @@ export default function CheckoutClient() {
     } = useCheckoutForm(defaultShipping);
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('bank_transfer');
     const isOrderCompleted = useRef(false);
 
     // 최신 가격 동기화
@@ -58,46 +62,98 @@ export default function CheckoutClient() {
             else if (!shippingInfo.phone.trim()) toast.error('연락처를 입력해주세요.');
             else if (!shippingInfo.roadAddress) toast.error('주소를 검색해주세요.');
             else if (!shippingInfo.detailAddress.trim()) toast.error('상세 주소를 입력해주세요.');
-            else if (!depositorName.trim()) toast.error('입금자명을 입력해주세요.');
+            else if (paymentMethod === 'bank_transfer' && !depositorName.trim()) toast.error('입금자명을 입력해주세요.');
             return;
         }
 
         setIsProcessing(true);
         try {
-            const response = await fetch('/api/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user?.id,
-                    items: items.map(item => ({
-                        id: item.id,
-                        title: item.title,
-                        price: item.price,
-                        quantity: item.quantity,
-                        selectedColor: item.selectedColor,
-                        selectedSize: item.selectedSize,
-                    })),
-                    shippingInfo,
-                    depositorName,
-                    totalAmount: getTotalPrice() + getShippingFee(getTotalPrice()),
-                }),
-            });
+            const totalAmount = getTotalPrice() + getShippingFee(getTotalPrice());
+            const itemsPayload = items.map(item => ({
+                id: item.id,
+                title: item.title,
+                price: item.price,
+                quantity: item.quantity,
+                selectedColor: item.selectedColor,
+                selectedSize: item.selectedSize,
+            }));
 
-            const data = await response.json();
+            if (paymentMethod === 'bank_transfer') {
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user?.id,
+                        items: itemsPayload,
+                        shippingInfo,
+                        depositorName,
+                        totalAmount,
+                        paymentMethod: 'bank_transfer',
+                    }),
+                });
 
-            if (!response.ok) {
-                throw new Error(data.error || '주문 처리 중 오류가 발생했습니다.');
-            }
+                const data = await response.json();
 
-            isOrderCompleted.current = true;
-            clearCart();
+                if (!response.ok) {
+                    throw new Error(data.error || '주문 처리 중 오류가 발생했습니다.');
+                }
 
-            if (!user) {
-                toast.success(`비회원 주문이 완료되었습니다!\n주문조회 코드: ${data.orderCode}\n꼭 기억해주세요!`, { duration: 10000 });
-                router.push(`/order-lookup?code=${data.orderCode}&phone=${encodeURIComponent(shippingInfo.phone)}`);
+                finishOrder(data.orderCode);
             } else {
-                toast.success('주문이 완료되었습니다!');
-                router.push('/profile?tab=orders');
+                // PG 결제 (카드/간편결제)
+                const prepareResponse = await fetch('/api/payments/prepare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user?.id,
+                        items: itemsPayload,
+                        shippingInfo,
+                        totalAmount,
+                        depositorName: '',
+                    })
+                });
+
+                const prepareData = await prepareResponse.json();
+
+                if (!prepareResponse.ok) {
+                    throw new Error(prepareData.error || '결제 준비 중 오류가 발생했습니다.');
+                }
+
+                const { paymentId, orderId, orderCode } = prepareData;
+
+                const paymentResponse = await PortOne.requestPayment({
+                    storeId: PORTONE_STORE_ID,
+                    channelKey: PORTONE_CHANNEL_KEY,
+                    paymentId,
+                    orderName: items.length > 1 ? `${items[0].title} 외 ${items.length - 1}건` : items[0].title,
+                    totalAmount,
+                    currency: 'CURRENCY_KRW',
+                    payMethod: 'CARD',
+                    customer: {
+                        fullName: shippingInfo.name,
+                        phoneNumber: shippingInfo.phone,
+                    }
+                });
+
+                if (paymentResponse?.code != null) {
+                    // 결제 취소 또는 실패
+                    throw new Error(paymentResponse.message || '결제가 취소되었거나 실패했습니다.');
+                }
+
+                // 사후 검증
+                const verifyResponse = await fetch('/api/payments/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentId, orderId })
+                });
+
+                const verifyData = await verifyResponse.json();
+
+                if (!verifyResponse.ok) {
+                    throw new Error(verifyData.error || '결제 검증 오류가 발생했습니다.');
+                }
+
+                finishOrder(orderCode);
             }
         } catch (error: unknown) {
             console.error(error);
@@ -105,6 +161,19 @@ export default function CheckoutClient() {
             toast.error(errMsg);
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    const finishOrder = (orderCode: string) => {
+        isOrderCompleted.current = true;
+        clearCart();
+
+        if (!user) {
+            toast.success(`비회원 주문이 완료되었습니다!\n주문조회 코드: ${orderCode}\n꼭 기억해주세요!`, { duration: 10000 });
+            router.push(`/order-lookup?code=${orderCode}&phone=${encodeURIComponent(shippingInfo.phone)}`);
+        } else {
+            toast.success('주문이 완료되었습니다!');
+            router.push('/profile?tab=orders');
         }
     };
 
@@ -141,13 +210,21 @@ export default function CheckoutClient() {
                             onBlur={handleBlur}
                         />
 
-                        {/* 입금 정보 섹션 */}
-                        <DepositInfo
-                            depositorName={depositorName}
-                            setDepositorName={setDepositorName}
-                            error={fieldErrors.depositorName}
-                            onBlur={() => handleBlur('depositorName')}
+                        {/* 결제 수단 섹션 */}
+                        <PaymentMethodSelector 
+                            selectedMethod={paymentMethod}
+                            onMethodSelect={setPaymentMethod}
                         />
+
+                        {/* 입금 정보 섹션 (무통장 입금 시에만 렌더링) */}
+                        {paymentMethod === 'bank_transfer' && (
+                            <DepositInfo
+                                depositorName={depositorName}
+                                setDepositorName={setDepositorName}
+                                error={fieldErrors.depositorName}
+                                onBlur={() => handleBlur('depositorName')}
+                            />
+                        )}
                     </div>
 
                     {/* Right: Order Summary (30%) — desktop only */}
