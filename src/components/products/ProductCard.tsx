@@ -41,7 +41,7 @@ export function ProductCard({ product, onVideoPlay }: ProductCardProps) {
             {/* 제품 이미지 (Lookbook 스타일, 세로로 긴 3:4 비율 권장) */}
             <div className="relative w-full aspect-[3/4] bg-[var(--bg-elevated)] overflow-hidden cursor-pointer">
                 <Image
-                    src={product.displayImageUrl || product.tryOnImageUrl || product.imageUrl}
+                    src={product.imageUrl || product.displayImageUrl || product.tryOnImageUrl || '/placeholder.png'}
                     alt={product.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

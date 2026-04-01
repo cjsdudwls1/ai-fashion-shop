@@ -76,7 +76,7 @@ export function FeaturedProducts() {
                 <p className="text-sm text-[var(--text-muted)] tracking-wider uppercase mb-12">AI 피팅으로 엄선된 추천 상품</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
                     {products.map((product, idx) => {
-                        const imgSrc = product.display_image_url || product.tryon_image_url || product.image_url;
+                        const imgSrc = product.image_url || product.display_image_url || product.tryon_image_url || '/placeholder.png';
                         return (
                             <Link
                                 key={product.id}

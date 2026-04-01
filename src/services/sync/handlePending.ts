@@ -131,7 +131,6 @@ export async function handlePending(ctx: SyncContext): Promise<SyncHandlerResult
                 await productStore.updateVideoStatus({ id: product.id, status: 'completed', klingTaskId: null, tryonImageUrl: firstImageUrl, client: supabaseAdmin });
                 // [2026-03-08] supabaseAdmin 전달: anon key → service_role로 RLS 우회
                 // 근거: .docs/phase1-infinite-loop-rls-solution.md §4-2
-                await productStore.updateProduct(product.id, { displayImageUrl: firstImageUrl }, supabaseAdmin);
                 console.log(`[Sync Worker] AI 피팅 이미지 생성 완료! 대표: ${firstImageUrl}`);
             } else {
                 const combinedError = errors.length > 0 ? errors.join(' / ') : '알 수 없는 AI 이미지 생성 실패';
