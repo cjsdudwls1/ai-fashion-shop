@@ -35,177 +35,95 @@ export function ProductCard({ product, onVideoPlay }: ProductCardProps) {
 
     return (
         <div
-            className="glass-card group"
-            style={{ overflow: 'hidden', cursor: 'pointer', display: 'block', position: 'relative' }}
+            className="group flex flex-col relative w-full overflow-hidden"
+            onClick={handleImageClick}
         >
-            {/* 제품 이미지 */}
-            <div style={{ position: 'relative', aspectRatio: '1/1', overflow: 'hidden' }} onClick={handleImageClick}>
+            {/* 제품 이미지 (Lookbook 스타일, 세로로 긴 3:4 비율 권장) */}
+            <div className="relative w-full aspect-[3/4] bg-[var(--bg-elevated)] overflow-hidden cursor-pointer">
                 <Image
                     src={product.displayImageUrl || product.tryOnImageUrl || product.imageUrl}
                     alt={product.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="product-image"
-                    style={{ objectFit: 'cover', transition: 'transform 0.5s' }}
+                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
 
                 {/* 품절 오버레이 */}
                 {totalColorStock === 0 && totalSizeStock === 0 && (
-                    <div className="absolute inset-0 bg-black/60 z-10 flex items-center justify-center">
-                        <span className="text-white font-bold text-lg tracking-widest border-2 border-white px-4 py-2">
+                    <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                        <span className="text-black font-semibold text-xs tracking-[0.2em] bg-white/80 px-4 py-2">
                             SOLD OUT
                         </span>
                     </div>
                 )}
 
-                {/* 영상 오버레이 */}
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(0,0,0,0.4)',
-                    opacity: (product.videoStatus === 'generating' || product.videoStatus === 'failed') ? 1 : 0,
-                    transition: 'opacity 0.3s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    pointerEvents: 'none'
-                }} className="card-overlay">
-                    {product.videoStatus === 'generating' ? (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            padding: '8px 16px',
-                            borderRadius: '9999px',
-                            background: 'rgba(0,0,0,0.5)',
-                            backdropFilter: 'blur(8px)'
-                        }}>
-                            <div className="spinner" />
-                            <span style={{ color: 'white', fontSize: '14px' }}>영상 생성 중...</span>
+                {/* 영상 및 AI 상태 오버레이 (미니멀 글래스모피즘) */}
+                <div className="absolute top-3 left-3 flex flex-col gap-2 z-20 pointer-events-none">
+                    {product.videoStatus === 'generating' && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-black/5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-accent)] animate-pulse" />
+                            <span className="text-[10px] font-semibold text-black tracking-widest uppercase">AI Generating</span>
                         </div>
-                    ) : product.videoStatus === 'failed' ? (
-                        <div
-                            title={product.videoErrorReason || '알 수 없는 오류'}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 16px',
-                                borderRadius: '9999px',
-                                background: 'rgba(239, 68, 68, 0.9)',
-                                backdropFilter: 'blur(8px)',
-                                cursor: 'help'
-                            }}
-                        >
-                            <AlertTriangle size={20} color="white" />
-                            <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>
-                                영상 생성 실패
-                                {product.videoErrorReason && (
-                                    <span style={{ fontSize: '11px', display: 'block', fontWeight: '400', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {product.videoErrorReason.includes('pixel') ? '이미지 포맷 오류' : product.videoErrorReason}
-                                    </span>
-                                )}
-                            </span>
+                    )}
+                    {product.videoStatus === 'completed' && product.videoUrl && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-black/5">
+                            <Play className="w-3 h-3 text-black fill-black" />
+                            <span className="text-[10px] font-semibold text-black tracking-widest uppercase">Video</span>
                         </div>
-                    ) : null}
+                    )}
+                    {product.videoStatus === 'failed' && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50/80 backdrop-blur-md border border-red-500/20">
+                            <AlertTriangle className="w-3 h-3 text-red-500" />
+                            <span className="text-[10px] font-semibold text-red-600 tracking-widest uppercase">Failed</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* 제품 정보 */}
-            <div style={{ padding: '20px' }} onClick={() => router.push(`/products/${product.id}`)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: 0, cursor: 'pointer' }} className="hover:text-indigo-600 transition-colors">
-                            {product.name}
-                        </h3>
-                    </div>
-                    {product.videoStatus === 'generating' && (
-                        <span className="badge badge-warning animate-pulse" style={{ fontSize: '11px', flexShrink: 0 }}>AI 피팅모델 생성중</span>
-                    )}
-                    {product.videoStatus === 'completed' && product.videoUrl && (
-                        <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}>
-                            <Play size={12} fill="currentColor" />
-                            영상 있음
-                        </span>
-                    )}
-                    {product.videoStatus === 'completed' && !product.videoUrl && product.tryOnImageUrl && (
-                        <span className="badge badge-info" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}>
-                            피팅 이미지
-                        </span>
-                    )}
-                    {product.videoStatus === 'pending' && (
-                        <span className="badge badge-info" style={{ fontSize: '11px', flexShrink: 0 }}>대기 중</span>
-                    )}
-                    {product.videoStatus === 'failed' && (
-                        <span
-                            className="badge badge-primary"
-                            title={product.videoErrorReason || '알 수 없는 오류'}
-                            style={{
-                                fontSize: '11px',
-                                flexShrink: 0,
-                                backgroundColor: '#ef4444',
-                                color: 'white',
-                                cursor: 'help'
-                            }}
-                        >
-                            실패: {product.videoErrorReason ? (product.videoErrorReason.length > 10 ? product.videoErrorReason.substring(0, 10) + '...' : product.videoErrorReason) : '오류'}
+            {/* 제품 정보 (Minimal & Editorial) */}
+            <div className="pt-4 pb-2 flex flex-col">
+                <div className="flex justify-between items-start gap-4">
+                    <h3 className="text-sm font-semibold font-serif tracking-wide text-[var(--text-primary)] hover:text-gray-500 transition-colors cursor-pointer line-clamp-1">
+                        {product.name}
+                    </h3>
+                    {product.price != null && product.price > 0 && (
+                        <span className="text-sm font-medium text-[var(--text-primary)] whitespace-nowrap">
+                            ₩{product.price.toLocaleString()}
                         </span>
                     )}
                 </div>
 
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
-                    {product.fabric}
+                <p className="text-[12px] text-[var(--text-muted)] mt-1 tracking-wide line-clamp-1">
+                    {product.category || 'Collection'} 
+                    {product.fabric && ` · ${product.fabric}`}
                 </p>
 
-                {/* 색상 선택 */}
-                {product.colors.length > 0 && (
-                    <div style={{ marginBottom: '12px' }} onClick={handleControlClick}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>색상</span>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                            {product.colors.map((color: any, idx: number) => (
-                                <button
-                                    key={idx}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setSelectedColor(color.color);
-                                    }}
-                                    className={`badge ${selectedColor === color.color ? 'badge-primary' : 'bg-gray-200 text-gray-500'}`}
-                                    style={{ fontSize: '11px', border: selectedColor === color.color ? 'none' : '1px solid #e5e7eb' }}
-                                    disabled={color.quantity <= 0}
-                                >
-                                    {color.color} ({color.quantity})
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* 사이즈 선택 */}
-                {product.sizes.length > 0 && (
-                    <div onClick={handleControlClick}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>사이즈</span>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                            {product.sizes.map((size: any, idx: number) => (
-                                <button
-                                    key={idx}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setSelectedSize(size.size);
-                                    }}
-                                    className={`badge ${selectedSize === size.size ? 'badge-info' : 'bg-gray-200 text-gray-500'}`}
-                                    style={{ fontSize: '11px', border: selectedSize === size.size ? 'none' : '1px solid #e5e7eb' }}
-                                    disabled={size.quantity <= 0}
-                                >
-                                    {size.size} ({size.quantity})
-                                </button>
-                            ))}
-                        </div>
+                {/* Color/Size indicators (Minimal dots) */}
+                {(product.colors.length > 0 || product.sizes.length > 0) && (
+                    <div className="flex items-center gap-4 mt-3" onClick={handleControlClick}>
+                        {product.colors.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                {product.colors.filter((c: any) => c.quantity > 0).slice(0, 4).map((color: any, idx: number) => (
+                                    <div 
+                                        key={idx}
+                                        title={color.color}
+                                        className="w-2.5 h-2.5 rounded-full border border-gray-300"
+                                        style={{ backgroundColor: color.color.toLowerCase() }}
+                                    />
+                                ))}
+                                {product.colors.filter((c: any) => c.quantity > 0).length > 4 && (
+                                    <span className="text-[10px] text-[var(--text-muted)] ml-1">+</span>
+                                )}
+                            </div>
+                        )}
+                        
+                        {product.sizes.length > 0 && (
+                            <div className="flex gap-1.5 text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-wider">
+                                {product.sizes.filter((s: any) => s.quantity > 0).map((size: any, idx: number) => (
+                                    <span key={idx}>{size.size}</span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
