@@ -106,6 +106,7 @@ export default function RootLayout({
                   <p><span className="font-medium text-[var(--text-primary)] tracking-wide">모딕 (MODIC)</span></p>
                   <p>대표자: 천영진</p>
                   <p>사업자등록번호: 796-24-02124</p>
+                  <p>전화번호: {process.env.NEXT_PUBLIC_CONTACT_PHONE || "010-7773-1342"}</p>
                   <p className="max-w-[200px] leading-relaxed">경기도 의정부시 능곡로 13<br/>102동 210호 (신곡동)</p>
                   <p>cjsdudwls1357@gmail.com</p>
                   <a href="/privacy" className="font-medium text-[var(--text-primary)] mt-2 hover:underline tracking-wide">개인정보처리방침</a>
