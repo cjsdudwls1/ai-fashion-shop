@@ -102,6 +102,7 @@ export async function handlePending(ctx: SyncContext): Promise<SyncHandlerResult
             await productStore.updateVideoStatus({ id: product.id, status: 'generating', klingTaskId: 'image-generation', client: supabaseAdmin });
 
             let firstImageUrl: string | null = null;
+            const errors: string[] = [];
 
             for (const g of genders) {
                 console.log(`[Sync Worker] AI 피팅 이미지 생성 (${g}): ${product.id}`);
@@ -122,6 +123,7 @@ export async function handlePending(ctx: SyncContext): Promise<SyncHandlerResult
                     if (!firstImageUrl) firstImageUrl = cloudinaryUrl;
                 } else {
                     console.warn(`[Sync Worker] AI 피팅 이미지 (${g}) 실패: ${aiResult.error}`);
+                    if (aiResult.error) errors.push(`${g}: ${aiResult.error}`);
                 }
             }
 
@@ -132,7 +134,8 @@ export async function handlePending(ctx: SyncContext): Promise<SyncHandlerResult
                 await productStore.updateProduct(product.id, { displayImageUrl: firstImageUrl }, supabaseAdmin);
                 console.log(`[Sync Worker] AI 피팅 이미지 생성 완료! 대표: ${firstImageUrl}`);
             } else {
-                await productStore.updateVideoStatus({ id: product.id, status: 'failed', errorReason: 'AI 이미지 생성 실패 (모든 성별)', klingTaskId: null, tryonImageUrl: null, client: supabaseAdmin });
+                const combinedError = errors.length > 0 ? errors.join(' / ') : '알 수 없는 AI 이미지 생성 실패';
+                await productStore.updateVideoStatus({ id: product.id, status: 'failed', errorReason: `AI 이미지 생성 실패: ${combinedError}`, klingTaskId: null, tryonImageUrl: null, client: supabaseAdmin });
             }
         } catch (err: any) {
             console.error(`[Sync Worker] 이미지 생성 오류:`, err);

@@ -14,7 +14,10 @@ export async function fetchImageAsBase64(
 ): Promise<{ imageBytes: string; mimeType: string } | null> {
     try {
         console.log(`${logPrefix} 참조 이미지 다운로드: ${imageUrl.substring(0, 80)}...`);
-        const response = await fetch(imageUrl, { redirect: 'follow' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+        const response = await fetch(imageUrl, { redirect: 'follow', signal: controller.signal });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.warn(`${logPrefix} 이미지 다운로드 실패: HTTP ${response.status}`);

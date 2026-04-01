@@ -135,7 +135,7 @@ export default function RefundPage() {
           <div style={{ padding: '16px 20px', background: 'var(--bg-elevated)', borderRadius: 8 }}>
             <p>교환, 반품, 환불 관련 문의는 아래 채널을 통해 접수하실 수 있습니다.</p>
             <ul style={{ paddingLeft: 16, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <li>이메일: help@ai-fashion-shop.com</li>
+              <li>이메일: cjsdudwls1357@gmail.com</li>
               <li>운영시간: 평일 10:00 ~ 18:00 (주말·공휴일 휴무)</li>
             </ul>
           </div>

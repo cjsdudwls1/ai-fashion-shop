@@ -86,14 +86,15 @@ export default function ShippingForm({ shippingInfo, setShippingInfo, setOpenPos
                             type="text"
                             readOnly
                             placeholder="우편번호"
-                            className="checkout-input w-[120px] flex-shrink-0 cursor-pointer text-center"
+                            className="checkout-input flex-1 cursor-pointer text-center"
                             value={shippingInfo.zonecode}
                             onClick={() => setOpenPostcode(true)}
                         />
                         <button
                             type="button"
                             onClick={() => setOpenPostcode(true)}
-                            className="flex-1 h-[48px] whitespace-nowrap bg-[var(--text-primary)] text-[var(--bg-dark)] px-5 rounded-[var(--radius-md)] text-[14px] font-bold border-none cursor-pointer transition-opacity duration-200 hover:opacity-90"
+                            style={{ backgroundColor: 'var(--text-primary)', color: 'var(--bg-dark)' }}
+                            className="w-[100px] flex-shrink-0 h-[48px] whitespace-nowrap px-3 rounded-[var(--radius-md)] text-[14px] font-bold border-none cursor-pointer transition-opacity duration-200 hover:opacity-90"
                         >
                             주소 검색
                         </button>

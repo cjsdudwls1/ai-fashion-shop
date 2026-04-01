@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const DaumPostcode = dynamic(() => import('react-daum-postcode'), {
+    loading: () => <div style={{ height: '450px', background: 'var(--bg-elevated)' }} className="animate-shimmer" />,
+    ssr: false,
+});
 import { useCartStore } from '@/store/cartStore';
 import ShippingForm from '@/components/checkout/ShippingForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
@@ -32,6 +38,7 @@ export default function CheckoutClient() {
         isValid,
         openPostcode,
         setOpenPostcode,
+        handleCompletePostcode,
     } = useCheckoutForm(defaultShipping);
 
     const [isProcessing, setIsProcessing] = useState(false);
@@ -192,7 +199,7 @@ export default function CheckoutClient() {
     const finalPrice = totalPrice + shippingFee;
 
     return (
-        <div className="min-h-screen bg-[var(--bg-dark)] pt-28 pb-24 checkout-page-wrapper">
+        <div className="min-h-screen bg-[var(--bg-dark)] pt-28 checkout-page-wrapper" style={{ paddingBottom: '160px' }}>
             <div className="checkout-container">
                 <h1 className="text-[24px] font-bold text-[var(--text-primary)] mb-8">
                     주문/결제
@@ -267,6 +274,26 @@ export default function CheckoutClient() {
                     )}
                 </button>
             </div>
+
+            {/* Daum Postcode 모달 */}
+            {openPostcode && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-[var(--bg-elevated)] w-full max-w-lg rounded-[var(--radius-lg)] shadow-2xl relative overflow-hidden">
+                        <div className="flex justify-between items-center p-5 border-b border-[var(--border-color)]">
+                            <h3 className="text-lg font-bold text-[var(--text-primary)]">주소 검색</h3>
+                            <button
+                                onClick={() => setOpenPostcode(false)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="h-[450px]">
+                            <DaumPostcode onComplete={handleCompletePostcode} style={{ height: '100%' }} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

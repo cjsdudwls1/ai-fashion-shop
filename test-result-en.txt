@@ -1,0 +1,7 @@
+PK length: 1704
+PK starts with BEGIN: true
+PK line count: 29
+
+--- Test 1: Text gen (auth check) ---
+FAIL: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/locations/us-central1/publishers/google/models/gemini-2.0-flash` was not found or your project does not have access to it. Please ensure you are using a valid model version. For more information, see: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions","status":"NOT_FOUND"}}
+This is an AUTH problem. Stopping.

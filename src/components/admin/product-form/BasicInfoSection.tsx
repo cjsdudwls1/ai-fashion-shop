@@ -43,7 +43,7 @@ export default function BasicInfoSection({ formData, onChange, onPriceChange }: 
 
             <div className="mt-6">
                 <label className="block text-lg font-semibold mb-2 text-[var(--text-primary)]">성별 (Gender)</label>
-                <div className="admin-gender-group flex gap-4">
+                <div className="admin-gender-group flex flex-wrap gap-4">
                     {[
                         { value: 'female', label: '여성 (Female)' },
                         { value: 'male', label: '남성 (Male)' },

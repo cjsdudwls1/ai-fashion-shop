@@ -15,16 +15,16 @@ export default function PaymentMethodSelector({
   onMethodSelect
 }: PaymentMethodSelectorProps) {
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-gray-900">결제 수단</h3>
+    <section className="checkout-section">
+      <h2 className="checkout-section-title">결제 수단</h2>
       <div className="grid grid-cols-2 gap-4">
         <button
           type="button"
           onClick={() => onMethodSelect('card')}
           className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
             selectedMethod === 'card'
-              ? 'border-black bg-black/5 text-black'
-              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+              ? 'border-[var(--primary-color)] bg-[var(--bg-elevated)] text-[var(--primary-color)]'
+              : 'border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-primary)] hover:text-[var(--text-primary)]'
           }`}
         >
           <CreditCard className="w-6 h-6 mb-2" />
@@ -36,14 +36,14 @@ export default function PaymentMethodSelector({
           onClick={() => onMethodSelect('bank_transfer')}
           className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
             selectedMethod === 'bank_transfer'
-              ? 'border-black bg-black/5 text-black'
-              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+              ? 'border-[var(--primary-color)] bg-[var(--bg-elevated)] text-[var(--primary-color)]'
+              : 'border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-primary)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Landmark className="w-6 h-6 mb-2" />
           <span className="font-medium">무통장입금</span>
         </button>
       </div>
-    </div>
+    </section>
   )
 }

@@ -87,7 +87,7 @@ export default function StockManager({
                     </div>
 
                     {/* 수량 입력 + 추가 버튼 */}
-                    <div className="admin-qty-add-row" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginTop: '8px' }}>
+                    <div className="admin-qty-add-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '16px', marginTop: '8px' }}>
                         <div style={{ width: '120px' }}>
                             <label style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>수량 (Quantity)</label>
                             <input
@@ -121,8 +121,8 @@ export default function StockManager({
             </div>
 
             {/* 재고 목록 테이블 */}
-            <div style={{ width: '100%' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '18px' }}>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '18px', minWidth: '500px' }}>
                     <thead style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
                         <tr>
                             <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 600, fontSize: '16px', color: 'var(--text-secondary)' }}>옵션명</th>

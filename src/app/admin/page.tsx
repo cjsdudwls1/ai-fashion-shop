@@ -23,7 +23,7 @@ export default function AdminPage() {
 
     return (
         <div className="section-padding" style={{ background: 'var(--bg-elevated)', minHeight: '100vh', paddingBottom: '120px' }}>
-            <div className="container-main" style={{ maxWidth: '1000px' }}>
+            <div className="container-main pb-8" style={{ maxWidth: '1000px', width: '100%', padding: '0 20px' }}>
 
                 {/* 상단 액션 바 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
@@ -98,7 +98,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* 하단 액션 버튼 */}
-                    <div className="admin-bottom-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px' }}>
+                    <div className="admin-bottom-actions" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '12px', marginTop: '40px' }}>
                         <button
                             type="button"
                             onClick={() => router.back()}

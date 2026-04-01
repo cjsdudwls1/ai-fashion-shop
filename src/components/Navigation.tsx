@@ -34,30 +34,30 @@ export function Navigation() {
 
     return (
         <>
-            <header className="sticky top-0 left-0 right-0 z-50 bg-[var(--bg-dark)]/95 backdrop-blur-md border-b border-[var(--border-color)] transition-colors duration-300">
+            <header className="sticky top-0 left-0 right-0 z-50 bg-[var(--bg-dark)]/80 backdrop-blur-xl transition-all duration-500">
                 <nav className="container-main h-16 flex items-center justify-between">
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2 group z-50">
                         <div className="w-6 h-6 flex items-center justify-center border border-[var(--text-primary)] transition-all duration-300 group-hover:bg-[var(--text-primary)]">
                             <Zap className="w-3.5 h-3.5 text-[var(--text-primary)] group-hover:text-[var(--bg-dark)] transition-colors duration-300" />
                         </div>
-                        <span className="text-lg font-medium tracking-wide truncate mt-0.5">AI FASHION</span>
+                        <span className="text-xl font-bold font-serif tracking-[0.2em] truncate mt-0.5">AI FASHION</span>
                     </Link>
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center gap-8 lg:gap-10">
                         {!isCheckout && (
                             <>
-                                <Link href="/products" className="nav-link text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-[var(--primary-color)] transition-colors">
-                                    쇼핑하기
+                                <Link href="/products" className="nav-link text-[13px] uppercase tracking-widest font-semibold text-gray-900 dark:text-gray-100 hover:opacity-60 transition-opacity">
+                                    SHOP
                                 </Link>
-                                <Link href="/partnership" className="nav-link text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-[var(--primary-color)] transition-colors">
-                                    문의
+                                <Link href="/partnership" className="nav-link text-[13px] uppercase tracking-widest font-semibold text-gray-900 dark:text-gray-100 hover:opacity-60 transition-opacity">
+                                    CONTACT
                                 </Link>
 
                                 {isAdmin && (
-                                    <Link href="/admin" className="nav-link text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-[var(--primary-hover)]">
-                                        관리자
+                                    <Link href="/admin" className="nav-link text-[13px] uppercase tracking-widest font-bold text-indigo-600 dark:text-indigo-400 hover:opacity-70">
+                                        ADMIN
                                     </Link>
                                 )}
 
@@ -74,24 +74,24 @@ export function Navigation() {
                         {/* Desktop Auth Links */}
                         {user ? (
                             <>
-                                <Link href="/profile" className="flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-[var(--primary-color)] transition-colors">
+                                <Link href="/profile" className="flex items-center gap-2 text-[13px] uppercase tracking-widest font-semibold text-gray-900 dark:text-gray-100 hover:opacity-60 transition-opacity">
                                     <UserIcon className="w-4 h-4" />
-                                    <span>마이페이지</span>
+                                    <span>MY PAGE</span>
                                 </Link>
                                 <button
                                     onClick={handleLogout}
-                                    className="text-sm font-medium text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+                                    className="text-[13px] uppercase tracking-widest font-semibold text-gray-400 hover:text-red-500 transition-colors"
                                 >
-                                    로그아웃
+                                    LOGOUT
                                 </button>
                             </>
                         ) : (
                             <>
-                                <Link href="/order-lookup" className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-[var(--primary-color)] transition-colors">
-                                    주문 조회
+                                <Link href="/order-lookup" className="text-[13px] uppercase tracking-widest font-semibold text-gray-900 dark:text-gray-100 hover:opacity-60 transition-opacity">
+                                    TRACK ORDER
                                 </Link>
-                                <Link href="/login" className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-[var(--primary-color)] transition-colors">
-                                    로그인
+                                <Link href="/login" className="text-[13px] uppercase tracking-widest font-semibold text-gray-900 dark:text-gray-100 hover:opacity-60 transition-opacity">
+                                    LOGIN
                                 </Link>
                             </>
                         )}
@@ -266,7 +266,7 @@ function CartBadge() {
     if (!mounted || totalItems === 0) return null;
 
     return (
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center justify-center min-w-[20px] min-h-[20px] shadow-sm">
+        <span className="absolute -top-0.5 -right-0.5 bg-[var(--text-primary)] text-[var(--bg-dark)] text-[10px] font-bold rounded-full flex items-center justify-center w-4 h-4 ring-2 ring-[var(--bg-dark)] transition-transform duration-300 transform scale-100">
             {totalItems}
         </span>
     );

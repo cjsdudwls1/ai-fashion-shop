@@ -1,54 +1,46 @@
 @import "tailwindcss";
 @import "../styles/animations.css";
 
-/* Tailwind v4 - 테마 설정 */
+/* Tailwind v4 - 테마 설정 (Lookbook & Editorial Style) */
 @theme {
   --breakpoint-sm: 640px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
 
-  /* Sophisticated Palette - Slightly softer black/white */
-  --color-primary: #111827;
-  /* Soft Black (Gray-900) */
-  --color-primary-dark: #374151;
-  /* Gray-700 */
-  --color-secondary: #6b7280;
-  /* Gray-500 */
-  --color-accent: #111827;
+  /* Fonts */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-playfair), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  /* Sophisticated Palette - Editorial Monochrome */
+  --color-primary: var(--text-primary);
+  --color-primary-dark: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-accent: var(--brand-accent);
 }
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  /* 라이트 모드 팔레트 (Refined & Modern) */
-  --bg-dark: #ffffff;
-  /* Pure white background for cleanliness */
-  --bg-card: #f8fafc;
-  /* Slate-50 for subtle contrast */
-  --bg-elevated: #f1f5f9;
-  /* Slate-100 */
-  --text-primary: #0f172a;
-  /* Slate-900 (Deep Navy/Black) */
-  --text-secondary: #475569;
-  /* Slate-600 */
-  --text-muted: #94a3b8;
-  /* Slate-400 */
+  /* 라이트 모드 팔레트 (Editorial Mode - Pure Whites & True Blacks) */
+  --bg-dark: #ffffff; /* 순백색 배경 */
+  --bg-card: #fdfdfd; 
+  --bg-elevated: #f9fafb; /* 극도로 미세한 그레이 */
+  --text-primary: #000000; /* 진한 블랙 텍스트 */
+  --text-secondary: #555555; /* 중간 그레이 */
+  --text-muted: #999999; /* 밝은 그레이 */
 
-  /* 브랜드 컬러: Indigo (신뢰감, 고급스러움) */
-  --primary-color: #4f46e5;
-  /* Indigo-600 */
-  --primary-hover: #4338ca;
-  /* Indigo-700 */
-  --primary-light: #e0e7ff;
-  /* Indigo-100 */
+  /* 브랜드 컬러: Monochrome with subtle accent */
+  --primary-color: #000000;
+  --primary-hover: #333333;
+  --primary-light: #e5e5e5;
+  --brand-accent: #7c3aed; /* AI Shimmer 효과를 위한 Violet 포인트 */
 
   /* UI 요소 */
-  --border-color: #e2e8f0;
-  /* Slate-200 */
-  --glass-bg: rgba(255, 255, 255, 0.9);
-  --glass-border: #e2e8f0;
-  --shadow-color: rgba(15, 23, 42, 0.08);
+  --border-color: #eeeeee;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --shadow-color: rgba(0, 0, 0, 0.04);
 
   /* Font Weights */
   --font-light: 300;
@@ -58,34 +50,25 @@
   --font-extra-bold: 800;
 }
 
-/* 다크 모드 (Premium Dark - Deep Navy/Slate) */
+/* 다크 모드 (Premium Dark - Cinematic Black) */
 [data-theme="dark"] {
-  --bg-dark: #020617;
-  /* Slate-950 (Very deep navy) */
-  --bg-card: #0f172a;
-  /* Slate-900 */
-  --bg-elevated: #1e293b;
-  /* Slate-800 */
-  --text-primary: #f8fafc;
-  /* Slate-50 */
-  --text-secondary: #94a3b8;
-  /* Slate-400 */
-  --text-muted: #64748b;
-  /* Slate-500 */
+  --bg-dark: #0a0a0a; /* 트루 다크 */
+  --bg-card: #111111;
+  --bg-elevated: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
 
-  /* 브랜드 컬러 (Dark Mode - Slightly Lighter) */
-  --primary-color: #6366f1;
-  /* Indigo-500 */
-  --primary-hover: #818cf8;
-  /* Indigo-400 */
-  --primary-light: rgba(99, 102, 241, 0.15);
+  /* 브랜드 컬러 */
+  --primary-color: #ffffff;
+  --primary-hover: #cccccc;
+  --primary-light: rgba(255, 255, 255, 0.1);
+  --brand-accent: #a78bfa;
 
-  --border-color: #1e293b;
-  /* Slate-800 */
-  --glass-bg: rgba(15, 23, 42, 0.85);
-  --glass-border: #334155;
-  /* Slate-700 */
-  --shadow-color: rgba(0, 0, 0, 0.4);
+  --border-color: #262626;
+  --glass-bg: rgba(10, 10, 10, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -98,14 +81,25 @@ html {
   scroll-behavior: smooth;
 }
 
+/* 접근성: 애니메이션 감소 (Reduced Motion) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg-dark);
   color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.6;
   letter-spacing: -0.01em;
-  /* Slightly less tight than before */
 }
 
 /* 글로벌 스크롤바 스타일 - Minimal */
@@ -521,9 +515,9 @@ input:-webkit-autofill:active {
 
 :root {
   /* Design System Tokens */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
 
   /* Shadow 3단계 */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -666,11 +660,11 @@ input:-webkit-autofill:active {
    CHECKOUT SECTION CARD
    ================================================ */
 .checkout-section {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  box-shadow: var(--shadow-sm);
+  padding: 32px 24px;
+  box-shadow: none;
 }
 
 .checkout-section-title {
@@ -686,11 +680,11 @@ input:-webkit-autofill:active {
    ORDER SUMMARY CARD (#8)
    ================================================ */
 .order-summary-card {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  box-shadow: var(--shadow-lg);
+  padding: 32px 24px;
+  box-shadow: var(--shadow-sm);
   position: sticky;
   top: 80px;
 }
@@ -721,19 +715,21 @@ input:-webkit-autofill:active {
    ================================================ */
 .checkout-cta-btn {
   width: 100%;
-  height: 56px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--primary-color);
-  color: #fff;
-  border: none;
+  background: var(--text-primary);
+  color: var(--bg-dark);
+  border: 1px solid var(--text-primary);
   border-radius: var(--radius-md);
-  font-size: 17px;
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.2s ease, transform 0.15s ease;
+  transition: all 0.3s ease;
   outline: none;
   box-shadow: var(--shadow-md);
 }

@@ -137,7 +137,7 @@ export default function PrivacyPage() {
           <div style={{ padding: '16px 20px', background: 'var(--bg-elevated)', borderRadius: 8 }}>
             <ul style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
               <li>개인정보 보호책임자: 대표자</li>
-              <li>연락처: help@ai-fashion-shop.com</li>
+              <li>연락처: cjsdudwls1357@gmail.com</li>
             </ul>
           </div>
           <p style={{ marginTop: 12 }}>

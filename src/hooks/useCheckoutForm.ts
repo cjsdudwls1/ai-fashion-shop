@@ -84,36 +84,27 @@ export function useCheckoutForm(defaultShipping: DefaultShipping | null) {
         return true;
     };
 
-    // Daum Postcode Script Loading
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
-        script.async = true;
-        document.body.appendChild(script);
+    const handleCompletePostcode = (data: any) => {
+        let fullAddress = data.address;
+        let extraAddress = '';
 
-        return () => {
-            document.body.removeChild(script);
-        };
-    }, []);
-
-    // Postcode Handler
-    useEffect(() => {
-        if (openPostcode && window.daum && window.daum.Postcode) {
-            new window.daum.Postcode({
-                oncomplete: function (data: any) {
-                    setShippingInfo(prev => ({
-                        ...prev,
-                        zonecode: data.zonecode,
-                        roadAddress: data.roadAddress,
-                    }));
-                    setOpenPostcode(false);
-                },
-                onclose: () => {
-                    setOpenPostcode(false);
-                }
-            }).open();
+        if (data.addressType === 'R') {
+            if (data.bname !== '') {
+                extraAddress += data.bname;
+            }
+            if (data.buildingName !== '') {
+                extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName);
+            }
+            fullAddress += (extraAddress !== '' ? ` (${extraAddress})` : '');
         }
-    }, [openPostcode]);
+
+        setShippingInfo(prev => ({
+            ...prev,
+            zonecode: data.zonecode,
+            roadAddress: fullAddress,
+        }));
+        setOpenPostcode(false);
+    };
 
     return {
         shippingInfo,
@@ -126,5 +117,6 @@ export function useCheckoutForm(defaultShipping: DefaultShipping | null) {
         isValid,
         openPostcode,
         setOpenPostcode,
+        handleCompletePostcode,
     };
 }

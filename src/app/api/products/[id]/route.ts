@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { productStore } from '@/lib/productStore';
 import { requireAdmin, handleAuthError } from '@/lib/authUtils';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // GET: 개별 상품 조회
 export async function GET(
@@ -47,7 +48,7 @@ export async function PATCH(
         const body = await request.json();
 
         // productStore.updateProduct를 사용하여 부분 업데이트 (DB 접근 추상화 계층 활용)
-        const success = await productStore.updateProduct(id, body);
+        const success = await productStore.updateProduct(id, body, supabaseAdmin);
 
         if (!success) {
             return NextResponse.json({ error: '상품 업데이트 실패 (또는 대상 없음)' }, { status: 500 });

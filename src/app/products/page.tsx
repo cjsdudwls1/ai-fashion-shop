@@ -128,43 +128,35 @@ export default function ProductsPage() {
                         </div>
                     )}
 
-                    {/* 제목 */}
-                    <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                        <h1 className="text-hero" style={{ marginBottom: '12px' }}>
-                            <span className="text-gradient">
-                                {viewMode === 'trash' ? '휴지통' : '제품 갤러리'}
-                            </span>
+                    {/* 제목 (Editorial Style) */}
+                    <div className="text-center mb-12">
+                        <h1 className="font-serif text-3xl md:text-5xl font-bold tracking-tight mb-4">
+                            {viewMode === 'trash' ? 'Trash' : 'The Collection'}
                         </h1>
-                        <p style={{ color: 'var(--text-secondary)' }}>
+                        <p className="text-sm text-[var(--text-secondary)] tracking-wider uppercase">
                             {viewMode === 'trash'
-                                ? '삭제된 상품은 1일 후 영구 삭제됩니다.'
-                                : 'AI가 소개하는 프리미엄 패션 아이템'}
+                                ? 'Deleted items will be permanently removed after 1 day.'
+                                : 'Curated pieces powered by AI fitting technology'}
                         </p>
                     </div>
 
-                    {/* 카테고리 필터 바 */}
-                    <div className="category-filter-wrapper">
-                        <div className="category-filter-scroll">
+                    {/* 카테고리 필터 바 (Minimal Tab Style) */}
+                    <div className="w-full border-b border-[var(--border-color)] mb-8 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center justify-center min-w-max md:min-w-0 gap-8 pb-3">
                             {availableCategories.map((cat) => (
                                 <button
                                     key={cat}
                                     onClick={() => setSelectedCategory(cat || 'all')}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '20px',
-                                        fontSize: '14px',
-                                        fontWeight: selectedCategory === cat ? '600' : '400',
-                                        background: selectedCategory === cat ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                                        color: selectedCategory === cat ? 'var(--bg-card)' : 'var(--text-secondary)',
-                                        border: selectedCategory === cat ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        flexShrink: 0,
-                                        minHeight: '40px',
-                                        whiteSpace: 'nowrap',
-                                    }}
+                                    className={`relative text-xs font-semibold tracking-widest uppercase py-2 transition-colors ${
+                                        selectedCategory === cat
+                                            ? 'text-[var(--text-primary)]'
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                    }`}
                                 >
-                                    {cat === 'all' ? '전체 보기' : (cat ? getCategoryDisplayName(cat) : '')}
+                                    {cat === 'all' ? 'ALL' : (cat ? getCategoryDisplayName(cat) : '')}
+                                    {selectedCategory === cat && (
+                                        <div className="absolute bottom-[-13px] left-0 right-0 h-[2px] bg-[var(--text-primary)]" />
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -173,13 +165,13 @@ export default function ProductsPage() {
 
                 {/* 제품 그리드 */}
                 {loading ? (
-                    <div className="product-grid">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
                         {Array.from({ length: 6 }).map((_, i) => (
                             <ProductCardSkeleton key={i} />
                         ))}
                     </div>
                 ) : filteredProducts.length > 0 ? (
-                    <div className="product-grid">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
                         {filteredProducts.map(product => (
                             <div key={product.id} style={{ position: 'relative' }}>
                                 {(isEditMode || viewMode === 'trash') && (

@@ -1,0 +1,15 @@
+﻿=== ?섍꼍蹂???뺤씤 ===
+GOOGLE_CLOUD_PROJECT: ai-fashion-shop-dev
+GOOGLE_CLOUD_LOCATION: us-central1
+GOOGLE_CLIENT_EMAIL: vertex-ai-accessor@ai-fashion-shop-dev.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY 議댁옱: true
+GOOGLE_PRIVATE_KEY ??50?? -----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w
+The user provided Google Cloud credentials will take precedence over the API key from the environment variable.
+
+=== Step 1: 李몄“ ?대?吏 ?ㅼ슫濡쒕뱶 ===
+HTTP ?곹깭: 200
+?대?吏 ?ш린: 5 KB
+MIME: image/webp
+
+=== Step 2: ?띿뒪??紐⑤뜽濡??몄쬆 ?뺤씤 ===

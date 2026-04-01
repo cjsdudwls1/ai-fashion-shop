@@ -12,13 +12,13 @@ export function ProductAccordion({ product }: ProductAccordionProps) {
     return (
         <div className="mt-20 space-y-8 border-t border-[var(--border-color)] pt-10">
             <details className="group">
-                <summary className="flex cursor-pointer items-center justify-between text-lg font-bold text-[var(--text-primary)] list-none py-2 hover:opacity-80 transition-opacity">
-                    <span>상품 상세 정보</span>
-                    <span className="transition group-open:rotate-180">
-                        <ChevronDown size={24} strokeWidth={1.5} />
+                <summary className="flex cursor-pointer items-center justify-between text-[11px] font-bold tracking-widest uppercase text-[var(--text-primary)] list-none py-2 hover:opacity-70 transition-opacity">
+                    <span>DETAILS</span>
+                    <span className="transition-transform duration-300 group-open:rotate-180">
+                        <ChevronDown size={16} strokeWidth={1.5} />
                     </span>
                 </summary>
-                <div className="group-open:animate-fadeIn mt-6 text-[var(--text-secondary)] space-y-4 text-base leading-relaxed pl-1">
+                <div className="group-open:animate-fadeIn mt-4 text-[var(--text-secondary)] space-y-3 text-[13px] leading-relaxed pb-4">
                     <p>성별: <span className="capitalize text-[var(--text-primary)] font-medium">{product.gender === 'female' ? '여성' : product.gender === 'male' ? '남성' : '남녀공용'}</span></p>
                     <p>등록일: {new Date(product.createdAt).toLocaleDateString()}</p>
                     <p className="leading-7 mt-4">
@@ -30,13 +30,13 @@ export function ProductAccordion({ product }: ProductAccordionProps) {
             </details>
 
             <details className="group border-t border-[var(--border-color)] pt-8">
-                <summary className="flex cursor-pointer items-center justify-between text-lg font-bold text-[var(--text-primary)] list-none py-2 hover:opacity-80 transition-opacity">
-                    <span>배송 및 반품 안내</span>
-                    <span className="transition group-open:rotate-180">
-                        <ChevronDown size={24} strokeWidth={1.5} />
+                <summary className="flex cursor-pointer items-center justify-between text-[11px] font-bold tracking-widest uppercase text-[var(--text-primary)] list-none py-2 hover:opacity-70 transition-opacity">
+                    <span>SHIPPING & RETURNS</span>
+                    <span className="transition-transform duration-300 group-open:rotate-180">
+                        <ChevronDown size={16} strokeWidth={1.5} />
                     </span>
                 </summary>
-                <div className="group-open:animate-fadeIn mt-6 text-[var(--text-secondary)] space-y-3 text-base leading-relaxed pl-1">
+                <div className="group-open:animate-fadeIn mt-4 text-[var(--text-secondary)] space-y-3 text-[13px] leading-relaxed pb-4">
                     <p>🚚 <span className="font-medium text-[var(--text-primary)] ml-1">무료 배송</span> ({FREE_SHIPPING_THRESHOLD.toLocaleString()}원 이상 구매 시)</p>
                     <p className="mt-2">🔄 배송 완료 후 7일 이내 교환/반품 가능 (미착용 및 원본 포장 상태 필수)</p>
                 </div>

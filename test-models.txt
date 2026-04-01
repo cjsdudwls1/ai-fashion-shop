@@ -1,0 +1,7 @@
+gemini-2.0-flash -> ERR: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/lo
+gemini-2.0-flash-001 -> ERR: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/lo
+gemini-1.5-flash -> ERR: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/lo
+gemini-1.5-flash-002 -> ERR: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/lo
+gemini-2.5-flash-preview-04-17 -> ERR: {"error":{"code":404,"message":"Publisher Model `projects/ai-fashion-shop-dev/lo
+
+--- Without vertexai (direct API key not available, skip) ---
