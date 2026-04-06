@@ -20,7 +20,7 @@ import { useCheckoutAuth } from '@/hooks/useCheckoutAuth';
 import { useCheckoutForm } from '@/hooks/useCheckoutForm';
 import * as PortOne from '@portone/browser-sdk/v2';
 import PaymentMethodSelector, { PaymentMethodType } from '@/components/checkout/PaymentMethodSelector';
-import { PORTONE_STORE_ID, PORTONE_CHANNEL_KEY } from '@/lib/portone';
+import { PORTONE_STORE_ID, PORTONE_CHANNEL_KEY, isCardPaymentAvailable } from '@/lib/portone';
 
 export default function CheckoutClient() {
     const router = useRouter();
@@ -108,6 +108,10 @@ export default function CheckoutClient() {
                 finishOrder(data.orderCode);
             } else {
                 // PG 결제 (카드/간편결제)
+                if (!isCardPaymentAvailable()) {
+                    throw new Error('현재 카드/간편결제 준비 중입니다. 무통장입금을 이용해주세요.');
+                }
+
                 const prepareResponse = await fetch('/api/payments/prepare', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
