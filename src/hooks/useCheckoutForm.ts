@@ -75,12 +75,12 @@ export function useCheckoutForm(defaultShipping: DefaultShipping | null) {
         });
     };
 
-    const isValid = () => {
+    const isValid = (paymentMethod?: string) => {
         if (!shippingInfo.name.trim()) return false;
         if (!shippingInfo.phone.trim()) return false;
         if (!shippingInfo.roadAddress) return false;
         if (!shippingInfo.detailAddress.trim()) return false;
-        if (!depositorName.trim()) return false;
+        if (paymentMethod === 'bank_transfer' && !depositorName.trim()) return false;
         return true;
     };
 

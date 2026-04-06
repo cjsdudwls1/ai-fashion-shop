@@ -64,7 +64,7 @@ export default function CheckoutClient() {
     const handlePayment = async () => {
         markAllTouched();
 
-        if (!isValid()) {
+        if (!isValid(paymentMethod)) {
             if (!shippingInfo.name.trim()) toast.error('받는 분 이름을 입력해주세요.');
             else if (!shippingInfo.phone.trim()) toast.error('연락처를 입력해주세요.');
             else if (!shippingInfo.roadAddress) toast.error('주소를 검색해주세요.');
